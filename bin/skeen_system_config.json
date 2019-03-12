@@ -1,0 +1,24 @@
+{
+  "agent_class": "SkeenAgent",
+  "rmcast_agent_class": "SimpleReliableMulticastAgent",
+  "group_number": 2,
+  "replicas_per_group": 1,
+  "group_members": [
+    {
+      "pid": 0,
+      "group": 0,
+      "host": "localhost",
+      "port": 50000,
+      "rmcast_address": "localhost",
+      "rmcast_port": 56000
+    },
+    {
+      "pid": 1,
+      "group": 1,
+      "host": "localhost",
+      "port": 50001,
+      "rmcast_address": "localhost",
+      "rmcast_port": 56001
+    }
+  ]
+}
