@@ -50,4 +50,9 @@ public class Node implements TCPDestination {
     public int getPort() {
         return port;
     }
+
+    @Override
+    public String toString() {
+        return "[node: " + pid + "]";
+    }
 }

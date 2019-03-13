@@ -4,6 +4,7 @@ import ch.usi.dslab.bezerra.netwrapper.Message;
 import ch.usi.dslab.bezerra.netwrapper.tcp.TCPConnection;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -24,19 +25,11 @@ public class Client extends Process {
         return connect(node);
     }
 
-    void atomicMulticast(Message msg, List<Group> destinations) {
-        Message newMsg = new Message(SkeenMessage.OP.Step1, msg, ++msgId, destinations);
-        reliableMulticast(newMsg, destinations);
-    }
-
     void multicast(Message message, List<Integer> groupIDs) {
-        List<Group> destinations = new ArrayList<>();
-        for (int id: groupIDs)
-            destinations.add(Group.getGroup(id));
-        for (Group g : destinations) {
-            Node node = g.nodeList.get(0);
-            send(message, node);
-        }
+        Message wrapperMessage = new Message(MessageType.CLIENT, node.pid, ++msgId, message, groupIDs);
+        Group group = Group.getGroup(groupIDs.get(0));
+        Node node = group.nodeList.get(0);
+        send(wrapperMessage, node);
     }
 
     void multicast(Message message, int groupID) {
@@ -69,16 +62,20 @@ public class Client extends Process {
         String configFile = args[1];
         Client client = new Client(clientId, configFile);
 
-        Message msg = new Message("client message" + ++client.msgId, clientId);
+        ArrayList<Integer> dests = new ArrayList<>(2);
+        dests.add(0);
+        dests.add(1);
+
+        Message msg = new Message("client message 1");
         // sending TCPDestination, TCPSender creates a connection if there is no connection available
         // TCPSender keeps track of those connections in a Map<TCPDestination, TCPConnection>
-        client.multicast(msg, 0);
+        client.multicast(msg, dests);
         logger.debug("sent the message " + msg);
 
-        Message msg2 = new Message("client message" + ++client.msgId, clientId);
+        Message msg2 = new Message("client message 2");
         // sending TCPDestination, TCPSender creates a connection if there is no connection available
         // TCPSender keeps track of those connections in a Map<TCPDestination, TCPConnection>
-        client.multicast(msg2, 1);
+        client.multicast(msg2, dests);
         logger.debug("sent the message " + msg);
     }
 }
