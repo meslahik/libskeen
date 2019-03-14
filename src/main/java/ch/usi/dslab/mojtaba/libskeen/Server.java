@@ -1,6 +1,7 @@
 package ch.usi.dslab.mojtaba.libskeen;
 
 import ch.usi.dslab.bezerra.netwrapper.Message;
+import ch.usi.dslab.bezerra.netwrapper.tcp.TCPConnection;
 import javafx.util.Pair;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +61,7 @@ public class Server extends Process {
         ArrayList<Pending> arr = pendingMsgs.get(pair);
         Pending p = arr.get(0);
         if (arr.size() < p.destination.size()) {
-            logger.debug("should wait for server votes for pair {}. received {} out of {} replies",
+            logger.debug("should wait for server votes for pair {}. received {} out of {} votes",
                     pair, arr.size(), p.destination.size());
             return;
         }
@@ -71,12 +72,15 @@ public class Server extends Process {
             maxLC = maxLC < LC ? LC : maxLC;
         }
         pendingMsgs.remove(pair);
-        ordered.put(maxLC, p.msg);
         logger.debug("have enough votes for pair {}. lc {} is chosen for the message [{}:{}, {}]",
                 pair, maxLC, p.clientId, p.msgId, p.msg);
+        ordered.put(maxLC, p.msg);
+        logger.debug("message {}:{} is put in ordered queue to be delivered", maxLC, p.msg);
 
         while(ordered.size() > 0) {
-            Integer minOrderedLC = ordered.firstKey();
+            Map.Entry<Integer, Message> minOrdered =  ordered.firstEntry();
+            Integer minOrderedLC = minOrdered.getKey();
+            Message msg = minOrdered.getValue();
 
             boolean flag = true;
             Collection<ArrayList<Pending>> arrs = pendingMsgs.values();
@@ -93,12 +97,17 @@ public class Server extends Process {
             }
 
             if(flag) {
-                Map.Entry<Integer, Message> minOrdered = ordered.pollFirstEntry();
-                Message msg = minOrdered.getValue();
+                ordered.pollFirstEntry();
                 atomicDeliver.add(msg);
-                logger.debug("atomic deliver message {}", msg);
+                logger.debug("atomic deliver message {}:{}", minOrderedLC, msg);
+
+//                TCPConnection connection = messageConnectionMap.get(msg);
+//                if (connection != null) {
+//                    Message reply = new Message("Ack for " + msg);
+//                    send(reply, connection);
+//                    logger.debug("sent reply: " + reply);
+//                }
             } else {
-                logger.debug("message is in ordered queue to be delivered later");
                 break;
             }
         }
@@ -123,7 +132,7 @@ public class Server extends Process {
             arr.add(p);
             pendingMsgs.put(pair, arr);
         }
-        logger.debug("added pending {} to pending messages", pair, p);
+        logger.debug("added {} to pending messages", p);
         processPendingMessages(pair);
     }
 
@@ -144,31 +153,10 @@ public class Server extends Process {
         }
     }
 
-    void processClientMessage(Message wrapperMessage) {
-        int clientId = (int ) wrapperMessage.getItem(1);
-        int messageId = (int) wrapperMessage.getItem(2);
-        Message message = (Message) wrapperMessage.getItem(3);
-        List<Integer> destinations = (List<Integer>) wrapperMessage.getItem(4);
-
-        Message newWrapperMessage = new Message(MessageType.STEP1, clientId, messageId, message, destinations);
-
-        List<Group> destinationGroups = new ArrayList<>();
-        for (int id: destinations)
-            destinationGroups.add(Group.getGroup(id));
-        for (Group g: destinationGroups) {
-            send(newWrapperMessage, g.nodeList.get(0));
-            logger.debug("sent message {} to server {}", newWrapperMessage, g.nodeList.get(0));
-        }
-    }
-
     @Override
     void uponDelivery(Message m) {
         MessageType type = (MessageType) m.getItem(0);
         switch (type) {
-            case CLIENT:
-                logger.debug("received CLIENT message {}", m);
-                processClientMessage(m);
-                break;
             case STEP1:
                 logger.debug("received STEP1 message {}", m);
                 processStep1Message(m);

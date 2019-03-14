@@ -26,10 +26,15 @@ public class Client extends Process {
     }
 
     void multicast(Message message, List<Integer> groupIDs) {
-        Message wrapperMessage = new Message(MessageType.CLIENT, node.pid, ++msgId, message, groupIDs);
-        Group group = Group.getGroup(groupIDs.get(0));
-        Node node = group.nodeList.get(0);
-        send(wrapperMessage, node);
+        Message wrapperMessage = new Message(MessageType.STEP1, node.pid, ++msgId, message, groupIDs);
+
+        List<Group> destinationGroups = new ArrayList<>();
+        for (int id: groupIDs)
+            destinationGroups.add(Group.getGroup(id));
+        for (Group g: destinationGroups) {
+            send(wrapperMessage, g.nodeList.get(0));
+        }
+        logger.debug("sent message {} to its destinations {}", wrapperMessage, groupIDs);
     }
 
     void multicast(Message message, int groupID) {
@@ -66,16 +71,12 @@ public class Client extends Process {
         dests.add(0);
         dests.add(1);
 
-        Message msg = new Message("client message 1");
+        Message msg = new Message("client message 1", dests);
         // sending TCPDestination, TCPSender creates a connection if there is no connection available
         // TCPSender keeps track of those connections in a Map<TCPDestination, TCPConnection>
         client.multicast(msg, dests);
-        logger.debug("sent the message " + msg);
 
-        Message msg2 = new Message("client message 2");
-        // sending TCPDestination, TCPSender creates a connection if there is no connection available
-        // TCPSender keeps track of those connections in a Map<TCPDestination, TCPConnection>
+        Message msg2 = new Message("client message 2", dests);
         client.multicast(msg2, dests);
-        logger.debug("sent the message " + msg);
     }
 }
