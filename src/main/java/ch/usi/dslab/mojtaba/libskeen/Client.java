@@ -2,9 +2,9 @@ package ch.usi.dslab.mojtaba.libskeen;
 
 import ch.usi.dslab.bezerra.netwrapper.Message;
 import ch.usi.dslab.bezerra.netwrapper.tcp.TCPConnection;
+import ch.usi.dslab.bezerra.netwrapper.tcp.TCPMessage;
 import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -53,9 +53,11 @@ public class Client extends Process {
     }
 
     @Override
-    void uponDelivery(Message m) {
-        logger.debug("received reply: " + m);
+    void uponDelivery(TCPMessage tcpMessage) {
         try {
+            Message m = tcpMessage.getContents();
+            logger.debug("received reply: " + m);
+            m.rewind();
             receivedReply.put(m);
         } catch (InterruptedException e) {
             e.printStackTrace();

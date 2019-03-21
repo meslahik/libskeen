@@ -2,6 +2,7 @@ package ch.usi.dslab.mojtaba.libskeen;
 
 import ch.usi.dslab.bezerra.netwrapper.Message;
 import ch.usi.dslab.bezerra.netwrapper.tcp.TCPConnection;
+import ch.usi.dslab.bezerra.netwrapper.tcp.TCPMessage;
 import javafx.util.Pair;
 import org.slf4j.LoggerFactory;
 
@@ -41,8 +42,10 @@ public class Server extends Process {
     int LC = 0;
 
     private Map<Pair<Integer, Integer>, ArrayList<Pending>> pendingMsgs = new ConcurrentHashMap<>();
-    private TreeMap<Integer, Message> ordered = new TreeMap<Integer, Message>();
-    public BlockingQueue<Message> atomicDeliver = new LinkedBlockingQueue<Message>();
+    private TreeMap<Integer, Pending> ordered = new TreeMap<>();
+    public BlockingQueue<Message> atomicDeliver = new LinkedBlockingQueue<>();
+
+    static Map<Pair<Integer, Integer>, TCPConnection> messageConnectionMap = new HashMap<>();
 
     public Server(int id, String configFile) {
         super(id, true, configFile);
@@ -74,13 +77,13 @@ public class Server extends Process {
         pendingMsgs.remove(pair);
         logger.debug("have enough votes for pair {}. lc {} is chosen for the message [{}:{}, {}]",
                 pair, maxLC, p.clientId, p.msgId, p.msg);
-        ordered.put(maxLC, p.msg);
+        ordered.put(maxLC, p);
         logger.debug("message {}:{} is put in ordered queue to be delivered", maxLC, p.msg);
 
         while(ordered.size() > 0) {
-            Map.Entry<Integer, Message> minOrdered =  ordered.firstEntry();
+            Map.Entry<Integer, Pending> minOrdered =  ordered.firstEntry();
             Integer minOrderedLC = minOrdered.getKey();
-            Message msg = minOrdered.getValue();
+            Pending pending = minOrdered.getValue();
 
             boolean flag = true;
             Collection<ArrayList<Pending>> arrs = pendingMsgs.values();
@@ -88,8 +91,8 @@ public class Server extends Process {
             while(it.hasNext()) {
                 ArrayList<Pending> arr2 = it.next();
                 for(int i=0; i<arr2.size(); i++) {
-                    Pending pending = arr2.get(i);
-                    if (pending.LC < minOrderedLC) {
+                    Pending pending2 = arr2.get(i);
+                    if (pending2.LC < minOrderedLC) {
                         flag = false;
                         break;
                     }
@@ -98,15 +101,19 @@ public class Server extends Process {
 
             if(flag) {
                 ordered.pollFirstEntry();
-                atomicDeliver.add(msg);
-                logger.debug("atomic deliver message {}:{}", minOrderedLC, msg);
+                atomicDeliver.add(pending.msg);
+                logger.debug("atomic deliver message {}:{}", minOrderedLC, pending.msg);
 
-//                TCPConnection connection = messageConnectionMap.get(msg);
-//                if (connection != null) {
-//                    Message reply = new Message("Ack for " + msg);
-//                    send(reply, connection);
-//                    logger.debug("sent reply: " + reply);
-//                }
+                Pair<Integer, Integer> pairOrdered = new Pair<>(pending.clientId, pending.msgId);
+                TCPConnection connection = messageConnectionMap.get(pairOrdered);
+                if (node.pid == 0 && connection != null) {
+                    Message reply = new Message("Ack for " + pending.msg);
+                    send(reply, connection);
+                    logger.debug("sent reply: " + reply);
+                    messageConnectionMap.remove(pairOrdered);
+                    logger.debug("removed pair {} form message connection map", pairOrdered);
+                } else if (connection == null)
+                    logger.debug("no connection found for pair {}", pairOrdered);
             } else {
                 break;
             }
@@ -154,11 +161,18 @@ public class Server extends Process {
     }
 
     @Override
-    void uponDelivery(Message m) {
+    void uponDelivery(TCPMessage tcpMessage) {
+        TCPConnection connection = tcpMessage.getConnection();
+        Message m = tcpMessage.getContents();
+
         MessageType type = (MessageType) m.getItem(0);
         switch (type) {
             case STEP1:
                 logger.debug("received STEP1 message {}", m);
+                int clientId = (int ) m.getItem(1);
+                int messageId = (int) m.getItem(2);
+                messageConnectionMap.put(new Pair<>(clientId, messageId), connection);
+
                 processStep1Message(m);
                 break;
             case STEP2:

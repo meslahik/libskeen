@@ -19,8 +19,6 @@ public abstract class Process implements Runnable {
     boolean running;
     Thread processThread;
 
-    static Map<Message, TCPConnection> messageConnectionMap = new MapMaker().weakKeys().weakValues().makeMap();
-
 //    static Map<Integer, Process> pidsIndex = new ConcurrentHashMap<>();
 
     Map<Integer, TCPConnection> connectedPRocesses = new HashMap<Integer, TCPConnection>();
@@ -118,11 +116,11 @@ public abstract class Process implements Runnable {
                 if (newTcpMsg == null)
                     continue;
                 else {
-                    TCPConnection connection = newTcpMsg.getConnection();
-                    Message contents = newTcpMsg.getContents();
-                    contents.rewind();
-                    messageConnectionMap.put(contents, connection);
-                    uponDelivery(contents);
+//                    TCPConnection connection = newTcpMsg.getConnection();
+//                    Message contents = newTcpMsg.getContents();
+//                    contents.rewind();
+//                    messageConnectionMap.put(contents, connection);
+                    uponDelivery(newTcpMsg);
                 }
             }
             logger.debug("Exiting process received messages loop...");
@@ -132,6 +130,6 @@ public abstract class Process implements Runnable {
         }
     }
 
-    abstract void uponDelivery(Message m);
+    abstract void uponDelivery(TCPMessage m);
 
 }
