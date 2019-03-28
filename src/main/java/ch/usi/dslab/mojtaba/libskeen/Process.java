@@ -2,7 +2,6 @@ package ch.usi.dslab.mojtaba.libskeen;
 
 import ch.usi.dslab.bezerra.netwrapper.Message;
 import ch.usi.dslab.bezerra.netwrapper.tcp.*;
-import com.google.common.collect.MapMaker;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
@@ -11,7 +10,7 @@ import java.util.*;
 public abstract class Process implements Runnable {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(Process.class);
 
-    Node node;
+    public Node node;
 
     TCPReceiver receiver;
     private TCPSender   sender;

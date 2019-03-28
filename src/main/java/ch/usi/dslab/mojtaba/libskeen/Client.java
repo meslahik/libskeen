@@ -11,7 +11,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class Client extends Process {
-    private static final org.slf4j.Logger logger = LoggerFactory.getLogger(Server.class);
+    private static final org.slf4j.Logger logger = LoggerFactory.getLogger(Client.class);
 
     int msgId = 0;
     BlockingQueue<Message> receivedReply = new LinkedBlockingQueue<>();
@@ -25,7 +25,7 @@ public class Client extends Process {
         return connect(node);
     }
 
-    void multicast(Message message, List<Integer> groupIDs) {
+    public void multicast(Message message, List<Integer> groupIDs) {
         Message wrapperMessage = new Message(MessageType.STEP1, node.pid, ++msgId, message, groupIDs);
 
         List<Group> destinationGroups = new ArrayList<>();
@@ -37,7 +37,7 @@ public class Client extends Process {
         logger.debug("sent message {} to its destinations {}", wrapperMessage, groupIDs);
     }
 
-    void multicast(Message message, int groupID) {
+    public void multicast(Message message, int groupID) {
         List<Integer> destinations = new ArrayList<>(1);
         destinations.add(groupID);
         multicast(message, destinations);

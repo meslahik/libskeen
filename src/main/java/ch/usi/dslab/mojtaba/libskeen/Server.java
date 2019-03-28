@@ -43,7 +43,7 @@ public class Server extends Process {
 
     private Map<Pair<Integer, Integer>, ArrayList<Pending>> pendingMsgs = new ConcurrentHashMap<>();
     private TreeMap<Integer, Pending> ordered = new TreeMap<>();
-    public BlockingQueue<Message> atomicDeliver = new LinkedBlockingQueue<>();
+//    public BlockingQueue<Message> atomicDeliver = new LinkedBlockingQueue<>();
 
     static Map<Pair<Integer, Integer>, TCPConnection> messageConnectionMap = new HashMap<>();
 
@@ -51,14 +51,14 @@ public class Server extends Process {
         super(id, true, configFile);
     }
 
-    Message atomicDeliver() {
-        try {
-            return atomicDeliver.take();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
+//    Message atomicDeliver() {
+//        try {
+//            return atomicDeliver.take();
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
+//        return null;
+//    }
 
     void processPendingMessages(Pair<Integer, Integer> pair) {
         ArrayList<Pending> arr = pendingMsgs.get(pair);
@@ -101,7 +101,7 @@ public class Server extends Process {
 
             if(flag) {
                 ordered.pollFirstEntry();
-                atomicDeliver.add(pending.msg);
+//                atomicDeliver.add(pending.msg);
                 logger.debug("atomic deliver message {}:{}", minOrderedLC, pending.msg);
 
                 Pair<Integer, Integer> pairOrdered = new Pair<>(pending.clientId, pending.msgId);

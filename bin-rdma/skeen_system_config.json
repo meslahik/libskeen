@@ -7,17 +7,17 @@
     {
       "pid": 0,
       "group": 0,
-      "host": "localhost",
+      "host": "192.168.4.4",
       "port": 50000,
-      "rmcast_address": "localhost",
+      "rmcast_address": "192.168.4.4",
       "rmcast_port": 56000
     },
     {
       "pid": 1,
       "group": 1,
-      "host": "localhost",
+      "host": "192.168.4.5",
       "port": 50001,
-      "rmcast_address": "localhost",
+      "rmcast_address": "192.168.4.5",
       "rmcast_port": 56001
     }
   ]

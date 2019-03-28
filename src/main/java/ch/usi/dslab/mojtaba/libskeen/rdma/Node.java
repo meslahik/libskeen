@@ -1,4 +1,4 @@
-package ch.usi.dslab.mojtaba.libskeen;
+package ch.usi.dslab.mojtaba.libskeen.rdma;
 
 import ch.usi.dslab.bezerra.netwrapper.tcp.TCPDestination;
 
@@ -27,10 +27,6 @@ public class Node implements TCPDestination {
         this.pid = pid;
         if (isServer)
             nodeMap.put(pid, this);
-    }
-
-    public int getPid() {
-        return pid;
     }
 
     void setGroupId (int gid) {

@@ -4,7 +4,7 @@
 
     <appender name="console" class="org.apache.log4j.ConsoleAppender">
         <layout class="org.apache.log4j.PatternLayout">
-            <param name="ConversionPattern" value="%r [%-5p] - %m%n"/>
+            <param name="ConversionPattern" value="%r [%-5p] [%-20C{1}] - %m%n"/>
             <!--<param name="ConversionPattern" value="[%p] %d{HH:mm:ss,SSS} %c %M - %m%n"/>-->
         </layout>
         <filter class="org.apache.log4j.varia.LevelRangeFilter">
@@ -12,20 +12,32 @@
             <!-- <param name="levelMax" value="DEBUG" /> -->
         </filter>
     </appender>
-    <logger name="ch.usi.dslab.mojtaba.libskeen.Server" additivity="false">
+    <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.Server" additivity="false">
+        <level value="error"/>
+        <appender-ref ref="console"/>
+    </logger>
+    <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.Configuration" additivity="false">
+        <level value="error"/>
+        <appender-ref ref="console"/>
+    </logger>
+    <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.Process" additivity="false">
+        <level value="error"/>
+        <appender-ref ref="console"/>
+    </logger>
+    <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.Client" additivity="false">
         <level value="debug"/>
         <appender-ref ref="console"/>
     </logger>
-    <logger name="ch.usi.dslab.mojtaba.libskeen.Configuration" additivity="false">
-        <level value="debug"/>
+    <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.MessageProcessor" additivity="false">
+        <level value="error"/>
         <appender-ref ref="console"/>
     </logger>
-    <logger name="ch.usi.dslab.mojtaba.libskeen.Process" additivity="false">
-        <level value="debug"/>
+    <logger name="com.ibm.disni" additivity="false">
+        <level value="error"/>
         <appender-ref ref="console"/>
     </logger>
-    <logger name="ch.usi.dslab.mojtaba.libskeen.Client" additivity="false">
-        <level value="debug"/>
+    <logger name="ch.usi.dslab.lel.ramcast" additivity="false">
+        <level value="error"/>
         <appender-ref ref="console"/>
     </logger>
     
