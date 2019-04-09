@@ -25,7 +25,7 @@
         <appender-ref ref="console"/>
     </logger>
     <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.Client" additivity="false">
-        <level value="debug"/>
+        <level value="error"/>
         <appender-ref ref="console"/>
     </logger>
     <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.MessageProcessor" additivity="false">

@@ -6,7 +6,9 @@ import ch.usi.dslab.bezerra.sense.monitors.ThroughputPassiveMonitor;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -95,9 +97,17 @@ public class Client extends Process {
         client.startRunning(sendQueue, recvQueue, maxinline, clientId);
         System.out.println("client " + client.node.pid + " started");
 
-        int[] dests = new int[2];
-        dests[0] = 0;
-        dests[1] = 1;
+        int groupSize = Group.groupSize();
+        Set<Integer> groupIDs = Group.groupIDs();
+        int[] dests = new int[groupSize];
+
+        Iterator<Integer> it = groupIDs.iterator();
+        int j=0;
+        while (it.hasNext())
+            dests[j++] = it.next();
+
+        System.out.println("groupsize: " + groupSize);
+        System.out.println("groupIDs: " + groupIDs);
 
 
 //        logger.debug("sending message ...");
@@ -105,7 +115,7 @@ public class Client extends Process {
 //        logger.debug("sending message ...");
 //        client.multicast(dests);
 
-        for (int i=0; i < 10; i++) {
+        for (int i=0; i < 1000000000; i++) {
             long sendTime = System.currentTimeMillis();
             client.multicast(dests);
             Message reply = client.deliverReply(dests[0]);

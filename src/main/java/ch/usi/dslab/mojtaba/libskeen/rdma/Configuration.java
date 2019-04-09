@@ -44,7 +44,7 @@ public class Configuration {
 
                 int pid = getJSInt(gmnode, "pid");
                 int gid = getJSInt(gmnode, "group");
-                String host = (String) gmnode.get("host");
+                String host = (String) gmnode.get("host_rdma");
                 int port = getJSInt(gmnode, "port");
 
                 Group rgroup = new Group(gid);

@@ -64,7 +64,7 @@ public abstract class Process {
         for (Node node : Node.nodeMap.values()) {
             connect(node, sendQueue, recvQueue, maxinline, clienttimeout);
         }
-        System.out.println("All senders created!");
+        System.out.println("Process " + node.pid + ": All senders created!");
     }
 
     public boolean connect(Node node, int sendQueue, int recvQueue, int maxinline, int clienttimeout) {

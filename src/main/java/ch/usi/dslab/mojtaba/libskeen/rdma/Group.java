@@ -3,6 +3,7 @@ package ch.usi.dslab.mojtaba.libskeen.rdma;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class Group {
     static Map<Integer, Group> groupList;
@@ -14,6 +15,10 @@ public class Group {
     static Group getGroup(int id) {
         return groupList.get(id);
     }
+
+    public static int groupSize() { return groupList.size(); }
+
+    public static Set<Integer> groupIDs() {return groupList.keySet(); }
 
     int id;
     ArrayList<Node> nodeList;

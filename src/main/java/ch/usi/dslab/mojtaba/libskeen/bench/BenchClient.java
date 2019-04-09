@@ -5,6 +5,7 @@ import ch.usi.dslab.bezerra.sense.DataGatherer;
 import ch.usi.dslab.bezerra.sense.monitors.LatencyPassiveMonitor;
 import ch.usi.dslab.bezerra.sense.monitors.ThroughputPassiveMonitor;
 import ch.usi.dslab.mojtaba.libskeen.Client;
+import ch.usi.dslab.mojtaba.libskeen.Group;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
@@ -34,20 +35,21 @@ public class BenchClient {
         latMonitor = new LatencyPassiveMonitor(client.node.getPid(), "client_overall", true);
 
 
+//        System.out.println("group size: " + Group.groupSize());
+//        System.out.println("group size: " + Group.groupIDs());
+        ArrayList<Integer> dests = new ArrayList<>(Group.groupSize());
+        dests.addAll(Group.groupIDs());
 
-        ArrayList<Integer> dests = new ArrayList<>(2);
-        dests.add(0);
-        dests.add(1);
-
+        System.out.println("client " + client.node.getPid() + " started");
         Message message = new Message("client message");
-        for (int i=0; i < 100000; i++) {
+        for (int i=0; i < 100000000; i++) {
             long sendTime = System.currentTimeMillis();
 
             client.multicast(message, dests);
             Message reply = client.deliverReply();
             logger.debug("reply: {}", reply);
             long recvTime = System.currentTimeMillis();
-            tpMonitor.incrementCount();;
+            tpMonitor.incrementCount();
             latMonitor.logLatency(sendTime, recvTime);
         }
     }

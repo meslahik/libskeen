@@ -6,13 +6,16 @@ import java.nio.ByteBuffer;
 
 public class Message implements RamcastMessage {
 
+//    public static int SERIALIZED_SIZE = 24 + 4;
     public static int SERIALIZED_SIZE = 24;
+//    public static int SERIALIZED_SIZE = 24 + 16;
+//    public static int SERIALIZED_SIZE = 24 + 32;
 
     // STEP1 and STEP2
     private int msgType;
     private int clientId;
     private int msgId;
-    private int destinationSize = 2;
+    private int destinationSize = 8;
     private int[] destinations;
 
     //STEP2 only

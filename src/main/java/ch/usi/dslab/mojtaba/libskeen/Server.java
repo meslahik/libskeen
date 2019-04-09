@@ -49,6 +49,7 @@ public class Server extends Process {
 
     public Server(int id, String configFile) {
         super(id, true, configFile);
+        System.out.println("server " + id + " started");
     }
 
 //    Message atomicDeliver() {

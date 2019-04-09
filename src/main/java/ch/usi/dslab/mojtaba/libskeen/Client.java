@@ -32,7 +32,11 @@ public class Client extends Process {
         for (int id: groupIDs)
             destinationGroups.add(Group.getGroup(id));
         for (Group g: destinationGroups) {
+//            long start = System.nanoTime();
             send(wrapperMessage, g.nodeList.get(0));
+//            long end = System.nanoTime();
+//            long elapsed = end - start;
+//            logger.debug("time for sending: " + start );
         }
         logger.debug("sent message {} to its destinations {}", wrapperMessage, groupIDs);
     }

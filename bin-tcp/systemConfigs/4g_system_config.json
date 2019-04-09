@@ -1,0 +1,44 @@
+{
+    "group_members": [
+        {
+            "group": 0, 
+            "rmcast_port": 56000, 
+            "pid": 0, 
+            "host": "192.168.3.1", 
+            "gpid": 0, 
+            "rmcast_address": "192.168.3.1", 
+            "port": 50000
+        }, 
+        {
+            "group": 1, 
+            "rmcast_port": 56001, 
+            "pid": 1, 
+            "host": "192.168.3.2", 
+            "gpid": 0, 
+            "rmcast_address": "192.168.3.2", 
+            "port": 50001
+        }, 
+        {
+            "group": 2, 
+            "rmcast_port": 56002, 
+            "pid": 2, 
+            "host": "192.168.3.3", 
+            "gpid": 0, 
+            "rmcast_address": "192.168.3.3", 
+            "port": 50002
+        }, 
+        {
+            "group": 3, 
+            "rmcast_port": 56003, 
+            "pid": 3, 
+            "host": "192.168.3.4", 
+            "gpid": 0, 
+            "rmcast_address": "192.168.3.4", 
+            "port": 50003
+        }
+    ], 
+    "replicas_per_group": 1, 
+    "group_number": 4, 
+    "agent_class": "JMcastAgent", 
+    "rmcast_agent_class": "SimpleReliableMulticastAgent"
+}
