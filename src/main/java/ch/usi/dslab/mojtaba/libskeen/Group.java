@@ -22,14 +22,20 @@ public class Group {
 
     int id;
     ArrayList<Node> nodeList;
+    ArrayList<Replica> replicaList;
 
     public Group(int id) {
         this.id = id;
         nodeList = new ArrayList<>();
+        replicaList = new ArrayList<>();
         groupList.put(id, this);
     }
 
     void addNode(Node node) {
         nodeList.add(node);
+    }
+
+    void addReplica(Replica replica) {
+        replicaList.add(replica);
     }
 }

@@ -7,9 +7,7 @@ import javafx.util.Pair;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingQueue;
 
 public class Server extends Process {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(Server.class);
@@ -38,17 +36,34 @@ public class Server extends Process {
         }
     }
 
+    class ConsensusDeliverer implements Runnable {
+
+        @Override
+        public void run() {
+            while (true) {
+                Message msg = replica.decide();
+                deliverConsensus(msg);
+            }
+        }
+    }
+
     // TODO needs to be Atomic?
     int LC = 0;
 
     private Map<Pair<Integer, Integer>, ArrayList<Pending>> pendingMsgs = new ConcurrentHashMap<>();
     private TreeMap<Integer, Pending> ordered = new TreeMap<>();
-//    public BlockingQueue<Message> atomicDeliver = new LinkedBlockingQueue<>();
 
     static Map<Pair<Integer, Integer>, TCPConnection> messageConnectionMap = new HashMap<>();
 
+    // Replica
+    Replica replica = Replica.replicaMap.get(node.pid);
+//    public BlockingQueue<Message> consensusMsgs = new LinkedBlockingQueue<>();
+
     public Server(int id, String configFile) {
         super(id, true, configFile);
+        replica.startRunning();
+        Thread consensusDeliverer = new Thread(new ConsensusDeliverer(), "ConsensusDeliverer-" + node.pid);
+        consensusDeliverer.start();
         System.out.println("server " + id + " started");
     }
 
@@ -103,18 +118,20 @@ public class Server extends Process {
             if(flag) {
                 ordered.pollFirstEntry();
 //                atomicDeliver.add(pending.msg);
-                logger.debug("atomic deliver message {}:{}", minOrderedLC, pending.msg);
+                logger.debug("atomic decide message {}:{}", minOrderedLC, pending.msg);
 
                 Pair<Integer, Integer> pairOrdered = new Pair<>(pending.clientId, pending.msgId);
                 TCPConnection connection = messageConnectionMap.get(pairOrdered);
-                if (node.pid == 0 && connection != null) {
+                if (node.pid == 0 && connection == null) { //TODO: node.pid == ??
+                    logger.debug("no connection found for pair {}", pairOrdered);
+                } else if (node.pid == 0) {
                     Message reply = new Message("Ack for " + pending.msg);
                     send(reply, connection);
                     logger.debug("sent reply: " + reply);
                     messageConnectionMap.remove(pairOrdered);
                     logger.debug("removed pair {} form message connection map", pairOrdered);
-                } else if (connection == null)
-                    logger.debug("no connection found for pair {}", pairOrdered);
+                }
+
             } else {
                 break;
             }
@@ -150,17 +167,35 @@ public class Server extends Process {
         Message message = (Message) wrapperMessage.getItem(3);
         List<Integer> destinations = (List<Integer>) wrapperMessage.getItem(4);
 
-        Message newWrapperMessage = new Message(MessageType.STEP2, clientId, messageId, message, destinations, node.pid, ++LC);
+        LC++;
 
-        List<Group> destinationGroups = new ArrayList<>();
-        for (int id: destinations)
-            destinationGroups.add(Group.getGroup(id));
-        for (Group g: destinationGroups) {
-            send(newWrapperMessage, g.nodeList.get(0));
-            logger.debug("sent message {} to server {}", newWrapperMessage, g.nodeList.get(0));
+        if (node.isLeader) {
+            Message newWrapperMessage = new Message(MessageType.STEP2, clientId, messageId, message, destinations, node.pid, LC);
+
+            List<Group> destinationGroups = new ArrayList<>();
+            for (int id : destinations)
+                destinationGroups.add(Group.getGroup(id));
+            for (Group g : destinationGroups) {
+                send(newWrapperMessage, g.nodeList.get(0));
+                logger.debug("sent message {} to server {}", newWrapperMessage, g.nodeList.get(0));
+            }
         }
     }
 
+    void deliverConsensus(Message m) {
+        MessageType type = (MessageType) m.getItem(0);
+        switch (type) {
+            case STEP1:
+                logger.debug("received STEP1 message {}", m);
+                processStep1Message(m);
+                break;
+            case STEP2:
+                logger.debug("received STEP2 message {}", m);
+                processStep2Message(m);
+        }
+    }
+
+    // only leader processes decide messages; client sends to leaders; leaders also sends to leaders
     @Override
     void uponDelivery(TCPMessage tcpMessage) {
         TCPConnection connection = tcpMessage.getConnection();
@@ -169,17 +204,12 @@ public class Server extends Process {
         MessageType type = (MessageType) m.getItem(0);
         switch (type) {
             case STEP1:
-                logger.debug("received STEP1 message {}", m);
-                int clientId = (int ) m.getItem(1);
+                int clientId = (int) m.getItem(1);
                 int messageId = (int) m.getItem(2);
                 messageConnectionMap.put(new Pair<>(clientId, messageId), connection);
-
-                processStep1Message(m);
-                break;
-            case STEP2:
-                logger.debug("received STEP2 message {}", m);
-                processStep2Message(m);
         }
+
+        replica.propose(m);
     }
 
     public static void main(String[] args) {

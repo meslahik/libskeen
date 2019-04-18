@@ -46,13 +46,24 @@ public class Configuration {
                 int gid = getJSInt(gmnode, "group");
                 String host = (String) gmnode.get("host");
                 int port = getJSInt(gmnode, "port");
+                int replicaPort = getJSInt(gmnode, "replica_port");
 
-                Group rgroup = new Group(gid);
+                Group rgroup;
+                boolean isleader = false;
+                if (Group.getGroup(gid) == null) {
+                    rgroup = new Group(gid);
+                    isleader = true;
+                }
+                else
+                    rgroup = Group.getGroup(gid);
                 Node node = new Node(pid, true);
                 node.setGroupId(gid);
                 node.setAddress(host);
                 node.setPort(port);
+                node.setLeader(isleader);
                 rgroup.addNode(node);
+                Replica replica = new Replica(host, replicaPort, pid, gid);
+                rgroup.addReplica(replica);
             }
             logger.debug("config file load successfully");
 

@@ -44,7 +44,8 @@ public abstract class Process implements Runnable {
         processThread = new Thread(this, "Process-" + node.pid);
         processThread.start();
         logger.debug("Process {} started running", node.pid);
-        createConnections();
+        if (node.isLeader)
+            createConnections();
     }
 
     public void createConnections() {
@@ -55,8 +56,8 @@ public abstract class Process implements Runnable {
         // this is sub-optimal though. ideally, a central coordinator (e.g., ZooKeeper, ZooFence, Volery...)
         // would be used. but that would be an over-optimization, done only if this library is ever published.
 
-        for (Node node : Node.nodeMap.values()) {
-            connect(node);
+        for (Group group: Group.groupList.values()) {
+            connect(group.nodeList.get(0));
         }
     }
 

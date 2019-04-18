@@ -7,55 +7,55 @@
     {
       "pid": 0,
       "group": 0,
-      "host": "192.168.3.11",
+      "host": "localhost",
       "port": 50000,
       "replica_port": 51000,
-      "rmcast_address": "192.168.3.11",
+      "rmcast_address": "localhost",
       "rmcast_port": 56000
     },
     {
       "pid": 1,
       "group": 0,
-      "host": "192.168.3.12",
+      "host": "localhost",
       "port": 50001,
       "replica_port": 51001,
-      "rmcast_address": "192.168.3.12",
+      "rmcast_address": "localhost",
       "rmcast_port": 56001
     },
     {
       "pid": 2,
       "group": 0,
-      "host": "192.168.3.13",
+      "host": "localhost",
       "port": 50002,
       "replica_port": 51002,
-      "rmcast_address": "192.168.3.13",
+      "rmcast_address": "localhost",
       "rmcast_port": 56002
     },
     {
       "pid": 3,
       "group": 1,
-      "host": "192.168.3.14",
+      "host": "localhost",
       "port": 50003,
       "replica_port": 51003,
-      "rmcast_address": "192.168.3.14",
+      "rmcast_address": "localhost",
       "rmcast_port": 56003
     },
     {
       "pid": 4,
       "group": 1,
-      "host": "192.168.3.15",
+      "host": "localhost",
       "port": 50004,
       "replica_port": 51004,
-      "rmcast_address": "192.168.3.15",
+      "rmcast_address": "localhost",
       "rmcast_port": 56004
     },
     {
       "pid": 5,
       "group": 1,
-      "host": "192.168.3.16",
+      "host": "localhost",
       "port": 50005,
       "replica_port": 51005,
-      "rmcast_address": "192.168.3.16",
+      "rmcast_address": "localhost",
       "rmcast_port": 56005
     }
   ]

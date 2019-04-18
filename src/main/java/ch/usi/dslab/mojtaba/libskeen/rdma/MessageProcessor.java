@@ -96,7 +96,7 @@ public class MessageProcessor implements OnReceiveCallback {
                 ordered.pollFirstEntry();
                 Pair<Integer, Integer> deliverPair = new Pair<>(pending.clientId, pending.msgId);
                 server.atomicDeliver.add(deliverPair);
-                logger.debug("atomic deliver message {}-{}:{}", minOrderedLC, pending.clientId, pending.msgId);
+                logger.debug("atomic decide message {}-{}:{}", minOrderedLC, pending.clientId, pending.msgId);
 
                 Message reply = new Message(3, pending.clientId, pending.msgId);
                 RamcastServerEvent event = waitingEvents.get(deliverPair);
