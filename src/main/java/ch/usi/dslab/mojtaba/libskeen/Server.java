@@ -76,25 +76,18 @@ public class Server extends Process {
 //        return null;
 //    }
 
-    void processPendingMessages(Pair<Integer, Integer> pair) {
-        ArrayList<Pending> arr = pendingMsgs.get(pair);
-        Pending p = arr.get(0);
-        if (arr.size() < p.destination.size()) {
-            logger.debug("should wait for server votes for pair {}. received {} out of {} votes",
-                    pair, arr.size(), p.destination.size());
-            return;
-        }
+    void processMaxLCMessages(Message wrapperMessage) {
+        int clientId = (int ) wrapperMessage.getItem(1);
+        int messageId = (int) wrapperMessage.getItem(2);
+        Message message = (Message) wrapperMessage.getItem(3);
+        List<Integer> destinations = (List<Integer>) wrapperMessage.getItem(4);
+        int nodeId = (int) wrapperMessage.getItem(5);
+        int maxLC = (int) wrapperMessage.getItem(6);
 
-        int maxLC = -1;
-        for (int i = 0; i < arr.size(); i++) {
-            int LC = arr.get(i).LC;
-            maxLC = maxLC < LC ? LC : maxLC;
-        }
-        pendingMsgs.remove(pair);
-        logger.debug("have enough votes for pair {}. lc {} is chosen for the message [{}:{}, {}]",
-                pair, maxLC, p.clientId, p.msgId, p.msg);
+        Pending p = new Pending(clientId, messageId, nodeId, maxLC, message, destinations);
+
         ordered.put(maxLC, p);
-        logger.debug("message {}:{} is put in ordered queue to be delivered", maxLC, p.msg);
+        logger.debug("message maxLC={}:{} is put in ordered queue to be delivered", maxLC, p.msg);
 
         while(ordered.size() > 0) {
             Map.Entry<Integer, Pending> minOrdered =  ordered.firstEntry();
@@ -118,13 +111,14 @@ public class Server extends Process {
             if(flag) {
                 ordered.pollFirstEntry();
 //                atomicDeliver.add(pending.msg);
-                logger.debug("atomic decide message {}:{}", minOrderedLC, pending.msg);
+                logger.info("atomic delivery message {}:{}", minOrderedLC, pending.msg);
 
                 Pair<Integer, Integer> pairOrdered = new Pair<>(pending.clientId, pending.msgId);
                 TCPConnection connection = messageConnectionMap.get(pairOrdered);
-                if (node.pid == 0 && connection == null) { //TODO: node.pid == ??
+                int replyNode = pending.destination.get(0);
+                if (node.pid == replyNode && connection == null) {
                     logger.debug("no connection found for pair {}", pairOrdered);
-                } else if (node.pid == 0) {
+                } else if (node.pid == replyNode) {
                     Message reply = new Message("Ack for " + pending.msg);
                     send(reply, connection);
                     logger.debug("sent reply: {} to {}", reply, connection);
@@ -140,7 +134,7 @@ public class Server extends Process {
 
     void processStep2Message(Message wrapperMessage) {
 
-        int clientId = (int ) wrapperMessage.getItem(1);
+        int clientId = (int) wrapperMessage.getItem(1);
         int messageId = (int) wrapperMessage.getItem(2);
         Message message = (Message) wrapperMessage.getItem(3);
         List<Integer> destinations = (List<Integer>) wrapperMessage.getItem(4);
@@ -150,15 +144,38 @@ public class Server extends Process {
         Pending p = new Pending(clientId, messageId, nodeId, lc, message, destinations);
         LC = Math.max(LC, p.LC);
         Pair<Integer, Integer> pair = new Pair<Integer, Integer>(p.clientId, p.msgId);
-        if (pendingMsgs.containsKey(pair))
-            pendingMsgs.get(pair).add(p);
-        else {
-            ArrayList<Pending> arr = new ArrayList<Pending>();
+
+        ArrayList<Pending> arr;
+        if (pendingMsgs.containsKey(pair)) {
+            arr = pendingMsgs.get(pair);
+            arr.add(p);
+        }
+        else{
+            arr = new ArrayList<>();
             arr.add(p);
             pendingMsgs.put(pair, arr);
         }
         logger.debug("added {} to pending messages", p);
-        processPendingMessages(pair);
+
+
+        // process pending messages
+        if (arr.size() < p.destination.size()) {
+            logger.debug("should wait for server votes for pair {}. received {} out of {} votes",
+                    pair, arr.size(), p.destination.size());
+            return;
+        }
+
+        int maxLC = -1;
+        for (int i = 0; i < arr.size(); i++) {
+            int LC = arr.get(i).LC;
+            maxLC = maxLC < LC ? LC : maxLC;
+        }
+        pendingMsgs.remove(pair);
+        logger.debug("have enough votes for pair {}. lc {} is chosen for the message [{}:{}, {}]",
+                pair, maxLC, p.clientId, p.msgId, p.msg);
+
+        Message newWrapperMessage = new Message(MessageType.STEP2, clientId, messageId, message, destinations, node.pid, maxLC);
+        replica.propose(newWrapperMessage);
     }
 
     void processStep1Message(Message wrapperMessage) {
@@ -191,11 +208,11 @@ public class Server extends Process {
                 break;
             case STEP2:
                 logger.debug("received STEP2 message {}", m);
-                processStep2Message(m);
+                processMaxLCMessages(m);
         }
     }
 
-    // only leader processes decide messages; client sends to leaders; leaders also sends to leaders
+    // only leader processes deliver these messages; client sends to leaders; leaders also sends to leaders
     @Override
     void uponDelivery(TCPMessage tcpMessage) {
         TCPConnection connection = tcpMessage.getConnection();
@@ -209,9 +226,11 @@ public class Server extends Process {
                 Pair<Integer, Integer> pair = new Pair<>(clientId, messageId);
                 messageConnectionMap.put(pair, connection);
                 logger.debug("messageConnectionMap put {}, {}", pair, connection);
+                replica.propose(m);
+                break;
+            case STEP2:
+                processStep2Message(m);
         }
-
-        replica.propose(m);
     }
 
     public static void main(String[] args) {

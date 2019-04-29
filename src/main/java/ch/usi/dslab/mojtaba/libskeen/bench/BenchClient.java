@@ -35,14 +35,14 @@ public class BenchClient {
         latMonitor = new LatencyPassiveMonitor(client.node.getPid(), "client_overall", true);
 
 
-//        System.out.println("group size: " + Group.groupSize());
-//        System.out.println("group size: " + Group.groupIDs());
+        System.out.println("group size: " + Group.groupSize());
+        System.out.println("group size: " + Group.groupIDs());
         ArrayList<Integer> dests = new ArrayList<>(Group.groupSize());
         dests.addAll(Group.groupIDs());
 
         System.out.println("client " + client.node.getPid() + " started");
         Message message = new Message("client message");
-        for (int i=0; i < 100000000; i++) {
+        for (int i=0; i < 10000; i++) {
             long sendTime = System.currentTimeMillis();
 
             client.multicast(message, dests);
@@ -52,6 +52,7 @@ public class BenchClient {
             tpMonitor.incrementCount();
             latMonitor.logLatency(sendTime, recvTime);
         }
+        System.out.println("finished");
     }
 
     public static void main(String[] args) {

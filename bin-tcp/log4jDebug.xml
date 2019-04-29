@@ -13,27 +13,27 @@
         </filter>
     </appender>
     <logger name="ch.usi.dslab.mojtaba.libskeen.Server" additivity="false">
-        <level value="debug"/>
+        <level value="error"/>
         <appender-ref ref="console"/>
     </logger>
     <logger name="ch.usi.dslab.mojtaba.libskeen.Configuration" additivity="false">
-        <level value="debug"/>
+        <level value="error"/>
         <appender-ref ref="console"/>
     </logger>
     <logger name="ch.usi.dslab.mojtaba.libskeen.Process" additivity="false">
-        <level value="debug"/>
+        <level value="error"/>
         <appender-ref ref="console"/>
     </logger>
     <logger name="ch.usi.dslab.mojtaba.libskeen.Client" additivity="false">
-        <level value="debug"/>
+        <level value="error"/>
         <appender-ref ref="console"/>
     </logger>
     <logger name="ch.usi.dslab.mojtaba.libskeen.bench.BenchClient" additivity="false">
-        <level value="debug"/>
+        <level value="error"/>
         <appender-ref ref="console"/>
     </logger>
     <logger name="ch.usi.dslab.mojtaba.libskeen.Replica" additivity="false">
-        <level value="debug"/>
+        <level value="error"/>
         <appender-ref ref="console"/>
     </logger>
     
