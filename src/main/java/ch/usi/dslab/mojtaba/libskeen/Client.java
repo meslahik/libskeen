@@ -84,5 +84,8 @@ public class Client extends Process {
 
         Message msg2 = new Message("client message 2", dests);
         client.multicast(msg2, dests);
+
+        Message msg3 = new Message("client message 3", dests);
+        client.multicast(msg3, dests);
     }
 }

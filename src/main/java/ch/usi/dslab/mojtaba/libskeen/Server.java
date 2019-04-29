@@ -47,7 +47,7 @@ public class Server extends Process {
         }
     }
 
-    // TODO needs to be Atomic?
+    // TODO: needs to be Atomic?
     int LC = 0;
 
     private Map<Pair<Integer, Integer>, ArrayList<Pending>> pendingMsgs = new ConcurrentHashMap<>();
@@ -127,7 +127,7 @@ public class Server extends Process {
                 } else if (node.pid == 0) {
                     Message reply = new Message("Ack for " + pending.msg);
                     send(reply, connection);
-                    logger.debug("sent reply: " + reply);
+                    logger.debug("sent reply: {} to {}", reply, connection);
                     messageConnectionMap.remove(pairOrdered);
                     logger.debug("removed pair {} form message connection map", pairOrdered);
                 }
@@ -206,7 +206,9 @@ public class Server extends Process {
             case STEP1:
                 int clientId = (int) m.getItem(1);
                 int messageId = (int) m.getItem(2);
-                messageConnectionMap.put(new Pair<>(clientId, messageId), connection);
+                Pair<Integer, Integer> pair = new Pair<>(clientId, messageId);
+                messageConnectionMap.put(pair, connection);
+                logger.debug("messageConnectionMap put {}, {}", pair, connection);
         }
 
         replica.propose(m);

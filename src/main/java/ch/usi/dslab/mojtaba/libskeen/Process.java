@@ -44,7 +44,7 @@ public abstract class Process implements Runnable {
         processThread = new Thread(this, "Process-" + node.pid);
         processThread.start();
         logger.debug("Process {} started running", node.pid);
-        if (node.isLeader)
+        if (!listenForConnections || node.isLeader)
             createConnections();
     }
 
