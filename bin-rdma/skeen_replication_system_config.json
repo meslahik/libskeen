@@ -1,0 +1,68 @@
+{
+  "agent_class": "SkeenAgent",
+  "rmcast_agent_class": "SimpleReliableMulticastAgent",
+  "group_number": 2,
+  "replicas_per_group": 3,
+  "group_members": [
+    {
+      "pid": 0,
+      "group": 0,
+      "host": "192.168.3.3",
+      "host_rdma": "192.168.4.3",
+      "port": 50000,
+      "replica_port": 51000,
+      "rmcast_address": "192.168.3.3",
+      "rmcast_port": 56000
+    },
+    {
+      "pid": 1,
+      "group": 0,
+      "host": "192.168.3.4",
+      "host_rdma": "192.168.4.4",
+      "port": 50000,
+      "replica_port": 51000,
+      "rmcast_address": "192.168.3.4",
+      "rmcast_port": 56000
+    },
+    {
+      "pid": 2,
+      "group": 0,
+      "host": "192.168.3.5",
+      "host_rdma": "192.168.4.5",
+      "port": 50000,
+      "replica_port": 51000,
+      "rmcast_address": "192.168.3.5",
+      "rmcast_port": 56000
+    },
+    {
+      "pid": 3,
+      "group": 1,
+      "host": "192.168.3.6",
+      "host_rdma": "192.168.4.6",
+      "port": 50001,
+      "replica_port": 51000,
+      "rmcast_address": "192.168.3.6",
+      "rmcast_port": 56001
+    },
+    {
+      "pid": 4,
+      "group": 1,
+      "host": "192.168.3.7",
+      "host_rdma": "192.168.4.7",
+      "port": 50001,
+      "replica_port": 51000,
+      "rmcast_address": "192.168.3.7",
+      "rmcast_port": 56001
+    },
+    {
+      "pid": 5,
+      "group": 1,
+      "host": "192.168.3.8",
+      "host_rdma": "192.168.4.8",
+      "port": 50001,
+      "replica_port": 51000,
+      "rmcast_address": "192.168.3.8",
+      "rmcast_port": 56001
+    }
+  ]
+}

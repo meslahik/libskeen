@@ -23,6 +23,8 @@ public class Node implements TCPDestination {
     String host;
     int port;
 
+    boolean isLeader;
+
     public Node (int pid, boolean isServer) {
         this.pid = pid;
         if (isServer)
@@ -39,6 +41,10 @@ public class Node implements TCPDestination {
 
     void setPort(int port) {
         this.port = port;
+    }
+
+    void setLeader (boolean isLeader) {
+        this.isLeader = isLeader;
     }
 
     @Override

@@ -1,15 +1,15 @@
 package ch.usi.dslab.mojtaba.libskeen.rdma;
 
-import ch.usi.dslab.lel.ramcast.OnReceiveCallback;
 import ch.usi.dslab.lel.ramcast.RamcastServerEvent;
+import ch.usi.dslab.lel.ramcast.ServerEventCallback;
 import javafx.util.Pair;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class MessageProcessor implements OnReceiveCallback {
+public class MessageProcessor implements ServerEventCallback {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(MessageProcessor.class);
 
     class Pending {
@@ -19,16 +19,17 @@ public class MessageProcessor implements OnReceiveCallback {
         int[] destination;
         int nodeId;
         int LC;
+        SkeenMessage message;
 
 
-        public Pending(int clientId, int msgId, int nodeId, int LC, int destinationSize, int[] destination) {
+        public Pending(int clientId, int msgId, int nodeId, int LC, int destinationSize, int[] destination, SkeenMessage skeenMessage) {
             this.clientId = clientId;
             this.msgId = msgId;
             this.destinationSize = destinationSize;
             this.destination = destination;
             this.nodeId = nodeId;
             this.LC = LC;
-
+            this.message = skeenMessage;
         }
 
         @Override
@@ -42,34 +43,45 @@ public class MessageProcessor implements OnReceiveCallback {
         }
     }
 
+    class ConsensusDeliverer implements Runnable {
+
+        @Override
+        public void run() {
+            while (true) {
+                SkeenMessage msg = replica.decide();
+                deliverConsensus(msg);
+            }
+        }
+    }
+
+    // TODO needs to be Atomic?
+    int LC = 0;
+
     Server server;
+    Replica replica;
 
     private Map<Pair<Integer, Integer>, ArrayList<Pending>> pendingMsgs = new ConcurrentHashMap<>();
     private Map<Pair<Integer, Integer>, RamcastServerEvent> waitingEvents = new ConcurrentHashMap<>();
     private TreeMap<Integer, Pending> ordered = new TreeMap<>();
-//    static Map<Pair<Integer, Integer>, RamcastSender> messageConnectionMap = new HashMap<>();
 
-    MessageProcessor(Server server) {
+    MessageProcessor(Server server, Replica replica) {
         this.server = server;
+        this.replica = replica;
+
+        Thread consensusDeliverer = new Thread(new ConsensusDeliverer(), "ConsensusDeliverer-" + server.node.pid);
+        consensusDeliverer.start();
     }
 
-    private void processPendingMessages(Pair<Integer, Integer> pair) {
-        ArrayList<Pending> arr = pendingMsgs.get(pair);
-        Pending p = arr.get(0);
-        if (arr.size() < p.destinationSize) {
-            logger.debug("should wait for server votes for pair {}. received {} out of {} votes",
-                    pair, arr.size(), p.destinationSize);
-            return;
-        }
+    private void processMaxLCMessages(SkeenMessage skeenMessage) {
+        int clientId = skeenMessage.getClientId();
+        int messageId = skeenMessage.getMsgId();
+        int destinationSize = skeenMessage.getDestinationSize();
+        int[] destinations = skeenMessage.getDestinations();
+        int nodeId = skeenMessage.getNodeId();
+        int maxLC = skeenMessage.getLC();
 
-        int maxLC = -1;
-        for (int i = 0; i < arr.size(); i++) {
-            int LC = arr.get(i).LC;
-            maxLC = maxLC < LC ? LC : maxLC;
-        }
-        pendingMsgs.remove(pair);
-        logger.debug("have enough votes for pair {}. lc {} is chosen for the message {}:{}",
-                pair, maxLC, p.clientId, p.msgId);
+        Pending p = new Pending(clientId, messageId, nodeId, maxLC, destinationSize, destinations, skeenMessage);
+
         ordered.put(maxLC, p);
         logger.debug("message {}-{}:{} is put in ordered queue to be delivered", maxLC, p.clientId, p.msgId);
 
@@ -98,92 +110,139 @@ public class MessageProcessor implements OnReceiveCallback {
                 server.atomicDeliver.add(deliverPair);
                 logger.debug("atomic decide message {}-{}:{}", minOrderedLC, pending.clientId, pending.msgId);
 
-                Message reply = new Message(3, pending.clientId, pending.msgId);
-                RamcastServerEvent event = waitingEvents.get(deliverPair);
-                event.setResponse(reply);
-                try {
-                    event.triggerResponse();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-                logger.debug("reply sent to the client");
-                waitingEvents.remove(deliverPair);
+//                SkeenMessage reply = new SkeenMessage(3, pending.clientId, pending.msgId);
+//                RamcastServerEvent event = waitingEvents.get(deliverPair);
+//                if (event != null) {
+//                    event.setSendBuffer(reply.getBuffer());
+//                    try {
+//                        event.triggerResponse();
+//                    } catch (Exception e) {
+//                        e.printStackTrace();
+//                    }
+//                    logger.debug("reply sent to the client");
+//                    waitingEvents.remove(deliverPair);
+//                }
             } else {
                 break;
             }
         }
     }
 
-    private synchronized void processStep2Message(Message message, RamcastServerEvent event) {
+    private synchronized void processStep2Message(SkeenMessage skeenMessage, RamcastServerEvent event) {
 
-        int clientId = message.getClientId();
-        int messageId = message.getMsgId();
-        int destinationSize = message.getDestinationSize();
-        int[] destinations = message.getDestinations();
-        int nodeId = message.getNodeId();
-        int lc = message.getLC();
-        logger.debug("received STEP2 message {} from {}", message, nodeId);
+        int clientId = skeenMessage.getClientId();
+        int messageId = skeenMessage.getMsgId();
+        int destinationSize = skeenMessage.getDestinationSize();
+        int[] destinations = skeenMessage.getDestinations();
+        int nodeId = skeenMessage.getNodeId();
+        int lc = skeenMessage.getLC();
+        logger.debug("received STEP2 skeenMessage {} from {}", skeenMessage, nodeId);
 
-        // reply is needed to be sent back to the server that sent this message
-        Message reply = new Message(3, clientId, messageId);
-        event.setResponse(reply);
-        try {
-            event.triggerResponse();
-        } catch (Exception e) {
-            e.printStackTrace();
+//        // reply is needed to be sent back to the server that sent this skeenMessage
+//        SkeenMessage reply = new SkeenMessage(3, clientId, messageId);
+//        event.setSendBuffer(reply.getBuffer());
+//        try {
+//            event.triggerResponse();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//        logger.debug("ACK skeenMessage sent back to the server {}", nodeId);
+
+        Pending p = new Pending(clientId, messageId, nodeId, lc, destinationSize, destinations, skeenMessage);
+        LC = Math.max(LC, p.LC);
+        Pair<Integer, Integer> pair = new Pair<>(p.clientId, p.msgId);
+        ArrayList<Pending> arr;
+        if (pendingMsgs.containsKey(pair)) {
+            arr = pendingMsgs.get(pair);
+            arr.add(p);
         }
-        logger.debug("ACK message sent back to the server {}", nodeId);
-
-        Pending p = new Pending(clientId, messageId, nodeId, lc, destinationSize, destinations);
-        server.LC = Math.max(server.LC, p.LC);
-        Pair<Integer, Integer> pair = new Pair<Integer, Integer>(p.clientId, p.msgId);
-        if (pendingMsgs.containsKey(pair))
-            pendingMsgs.get(pair).add(p);
         else {
-            ArrayList<Pending> arr = new ArrayList<Pending>();
+            arr = new ArrayList<>();
             arr.add(p);
             pendingMsgs.put(pair, arr);
         }
         logger.debug("added {} to pending messages", p);
-        processPendingMessages(pair);
+
+
+        // process pending messages
+        if (arr.size() < p.destinationSize) {
+            logger.debug("should wait for server votes for pair {}. received {} out of {} votes",
+                    pair, arr.size(), p.destinationSize);
+            return;
+        }
+
+        int maxLC = -1;
+        for (int i = 0; i < arr.size(); i++) {
+            int LC = arr.get(i).LC;
+            maxLC = maxLC < LC ? LC : maxLC;
+        }
+        pendingMsgs.remove(pair);
+        logger.debug("have enough votes for pair {}. lc {} is chosen for the message {}:{}",
+                pair, maxLC, p.clientId, p.msgId);
+
+        SkeenMessage newSkeenMessage = new SkeenMessage(2, clientId, messageId, destinationSize, destinations,
+                server.node.pid, maxLC);
+        replica.propose(newSkeenMessage);
     }
 
-    private void processStep1Message(Message message, RamcastServerEvent event) {
-        int clientId = message.getClientId();
-        int messageId = message.getMsgId();
-        int destinationSize = message.getDestinationSize();
-        int[] destinations = message.getDestinations();
+    private void processStep1Message(SkeenMessage skeenMessage) {
+        int clientId = skeenMessage.getClientId();
+        int messageId = skeenMessage.getMsgId();
+        int destinationSize = skeenMessage.getDestinationSize();
+        int[] destinations = skeenMessage.getDestinations();
 
-        Pair<Integer, Integer> pair = new Pair<>(clientId, messageId);
-        waitingEvents.put(pair, event);
+        LC++;
 
-        Message newMessage = new Message(2, clientId, messageId, destinationSize, destinations, server.node.pid, ++server.LC);
+        if (server.node.isLeader) {
+            SkeenMessage newSkeenMessage = new SkeenMessage(2, clientId, messageId, destinationSize, destinations,
+                    server.node.pid, LC);
 
-        List<Group> destinationGroups = new ArrayList<>();
-        for (int id: destinations)
-            destinationGroups.add(Group.getGroup(id));
-        for (Group g: destinationGroups) {
-            server.send(newMessage, false, g.nodeList.get(0).pid);
-            logger.debug("sent message {} to server {}", newMessage, g.nodeList.get(0));
+            List<Group> destinationGroups = new ArrayList<>();
+            for (int id : destinations)
+                destinationGroups.add(Group.getGroup(id));
+            for (Group g : destinationGroups) {
+                server.send(newSkeenMessage, false, g.nodeList.get(0).pid);
+                logger.debug("sent skeenMessage {} to server {}", newSkeenMessage, g.nodeList.get(0));
+            }
         }
     }
 
-    @Override
-    public void callback(RamcastServerEvent event) throws IOException {
-        Message m = (Message) event.getReceiveMessage();
-
+    void deliverConsensus(SkeenMessage m) {
         int type = m.getMsgType();
         switch (type) {
             case 1:
                 logger.debug("received STEP1 message {}", m);
-//                int clientId = m.getClientId();
-//                int messageId = m.getMsgId();
-//                messageConnectionMap.put(new Pair<>(clientId, messageId), connection);
-                processStep1Message(m, event);
+                processStep1Message(m);
+                break;
+            case 2:
+                logger.debug("received STEP2 message {}", m);
+                processMaxLCMessages(m);
+        }
+    }
+
+    // only leader processes receive these messages. clients send to leaders; leaders also send to leaders
+    @Override
+    public void call(RamcastServerEvent event) {
+        ByteBuffer buffer = event.getReceiveBuffer();
+        SkeenMessage m = new SkeenMessage();
+        m.update(buffer);
+
+        int type = m.getMsgType();
+        switch (type) {
+            case 1:
+//                logger.debug("received STEP1 message {}", m);
+                int clientId = m.getClientId();
+                int messageId = m.getMsgId();
+
+                Pair<Integer, Integer> pair = new Pair<>(clientId, messageId);
+                waitingEvents.put(pair, event);
+
+                replica.propose(m);
                 break;
             case 2:
 //                logger.debug("received STEP2 message {}", m);
                 processStep2Message(m, event);
         }
+        event.setFree();
     }
 }

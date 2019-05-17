@@ -57,7 +57,7 @@ public class Server extends Process {
 
     // Replica
     Replica replica = Replica.replicaMap.get(node.pid);
-//    public BlockingQueue<Message> consensusMsgs = new LinkedBlockingQueue<>();
+//    public BlockingQueue<SkeenMessage> consensusMsgs = new LinkedBlockingQueue<>();
 
     public Server(int id, String configFile) {
         super(id, true, configFile);
@@ -67,7 +67,7 @@ public class Server extends Process {
         System.out.println("server " + id + " started");
     }
 
-//    Message atomicDeliver() {
+//    SkeenMessage atomicDeliver() {
 //        try {
 //            return atomicDeliver.take();
 //        } catch (InterruptedException e) {

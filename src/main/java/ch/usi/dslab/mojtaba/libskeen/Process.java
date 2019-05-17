@@ -117,7 +117,7 @@ public abstract class Process implements Runnable {
                     continue;
                 else {
 //                    TCPConnection connection = newTcpMsg.getConnection();
-//                    Message contents = newTcpMsg.getContents();
+//                    SkeenMessage contents = newTcpMsg.getContents();
 //                    contents.rewind();
 //                    messageConnectionMap.put(contents, connection);
                     uponDelivery(newTcpMsg);

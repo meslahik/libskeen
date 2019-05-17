@@ -186,8 +186,8 @@ def noderange(first, last):
 def noderange2(first, last):
     return ["192.168.4." + str(val) for val in [node for node in range(first, last + 1) if node not in DEAD_NODES]]
 
-NODES = LOCALHOST_NODES if LOCALHOST else noderange(1, 8) + noderange(30,32)
-NODES_RDMA = LOCALHOST_NODES if LOCALHOST else noderange2(1, 8)
+NODES = LOCALHOST_NODES if LOCALHOST else noderange(3, 8)
+NODES_RDMA = LOCALHOST_NODES if LOCALHOST else noderange2(3, 8)
 # NODES_CLIENTS = noderange(20, 40)
 
 # PARTITION CONFIG

@@ -13,7 +13,7 @@
         </filter>
     </appender>
     <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.Server" additivity="false">
-        <level value="error"/>
+        <level value="debug"/>
         <appender-ref ref="console"/>
     </logger>
     <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.Configuration" additivity="false">
@@ -21,14 +21,30 @@
         <appender-ref ref="console"/>
     </logger>
     <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.Process" additivity="false">
-        <level value="error"/>
+        <level value="debug"/>
         <appender-ref ref="console"/>
     </logger>
     <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.Client" additivity="false">
-        <level value="error"/>
+        <level value="debug"/>
         <appender-ref ref="console"/>
     </logger>
     <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.MessageProcessor" additivity="false">
+        <level value="debug"/>
+        <appender-ref ref="console"/>
+    </logger>
+    <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.ConsensusMsgProcessor" additivity="false">
+        <level value="debug"/>
+        <appender-ref ref="console"/>
+    </logger>
+    <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.Replica" additivity="false">
+        <level value="debug"/>
+        <appender-ref ref="console"/>
+    </logger>
+    <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.ConsensusMessage" additivity="false">
+        <level value="error"/>
+        <appender-ref ref="console"/>
+    </logger>
+    <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.SkeenMessage" additivity="false">
         <level value="error"/>
         <appender-ref ref="console"/>
     </logger>

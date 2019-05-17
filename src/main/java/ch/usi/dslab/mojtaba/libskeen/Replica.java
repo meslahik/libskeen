@@ -40,7 +40,7 @@ public class Replica implements Runnable, TCPDestination{
     Map<Integer, TCPConnection> connectedPRocesses = new HashMap<>();
 
     // Acceptor
-    Map<Integer, Message> messages = new HashMap<>();
+//    Map<Integer, Message> messages = new HashMap<>();
 
     // Learner
     Map<Integer, ArrayList<Integer>> pendingMessages = new HashMap<>();
@@ -129,7 +129,7 @@ public class Replica implements Runnable, TCPDestination{
         int msgInstanceNum = (int) wrapperMessage.getItem(1);
         Message message = (Message) wrapperMessage.getItem(2);
 
-        messages.put(instanceNum, message);
+//        messages.put(instanceNum, message);
         Message newWrapperMessage = new Message(ConsensusMessageType.TWOB, msgInstanceNum, message, pid);
         for (Replica replica: Group.getGroup(gid).replicaList)
             send(newWrapperMessage, replica);

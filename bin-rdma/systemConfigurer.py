@@ -28,11 +28,11 @@ def generateJMcastConfiguration(nodes_available, nodes_available_rdma, numPartit
         for i_p in range(replicasPerPartition):
             config["group_members"].append({
                 "pid": pid,
-                "gpid": i_p,
                 "group": p,
                 "host": nodes_available[node_index],
                 "host_rdma": nodes_available_rdma[node_index],
                 "port": 50000 + pid,
+                "replica_port": 51000 + pid,
                 "rmcast_address": nodes_available[node_index],
                 "rmcast_port": 56000 + pid
             })

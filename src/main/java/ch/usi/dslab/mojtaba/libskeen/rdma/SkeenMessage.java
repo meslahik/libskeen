@@ -1,21 +1,23 @@
 package ch.usi.dslab.mojtaba.libskeen.rdma;
 
-import ch.usi.dslab.lel.ramcast.RamcastMessage;
+import ch.usi.dslab.lel.ramcast.messages.RamcastMessage;
+import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 
-public class Message implements RamcastMessage {
+public class SkeenMessage {
+    private static final org.slf4j.Logger logger = LoggerFactory.getLogger(SkeenMessage.class);
 
-//    public static int SERIALIZED_SIZE = 24 + 4;
-    public static int SERIALIZED_SIZE = 24;
-//    public static int SERIALIZED_SIZE = 24 + 16;
-//    public static int SERIALIZED_SIZE = 24 + 32;
+    private int SIZE = 24 + 32;
+//    private int SIZE = 100;
+
+    ByteBuffer buffer = ByteBuffer.allocateDirect(SIZE);
 
     // STEP1 and STEP2
     private int msgType;
     private int clientId;
     private int msgId;
-    private int destinationSize = 8;
+    private int destinationSize;
     private int[] destinations;
 
     //STEP2 only
@@ -24,25 +26,30 @@ public class Message implements RamcastMessage {
 
     private transient int ticket;
 
-    Message() {
+    SkeenMessage() {
 
     }
 
-    Message(int msgType, int clientId, int msgId) {
+
+    SkeenMessage(int msgType, int clientId, int msgId) {
         this.msgType = msgType;
         this.clientId = clientId;
         this.msgId = msgId;
+
+        write(buffer);
     }
 
-    Message(int msgType, int clientId, int msgId, int destinationSize, int[] destinations) {
+    SkeenMessage(int msgType, int clientId, int msgId, int destinationSize, int[] destinations) {
         this.msgType = msgType;
         this.clientId = clientId;
         this.msgId = msgId;
         this.destinationSize = destinationSize;
         this.destinations = destinations;
+
+        write(buffer);
     }
 
-    Message(int msgType, int clientId, int msgId, int destinationSize, int[] destinations, int nodeId, int LC) {
+    SkeenMessage(int msgType, int clientId, int msgId, int destinationSize, int[] destinations, int nodeId, int LC) {
         this.msgType = msgType;
         this.clientId = clientId;
         this.msgId = msgId;
@@ -50,9 +57,10 @@ public class Message implements RamcastMessage {
         this.destinations = destinations;
         this.nodeId = nodeId;
         this.LC = LC;
+
+        write(buffer);
     }
 
-    @Override
     public int write(ByteBuffer buffer) {
         buffer.putInt(msgType);
         buffer.putInt(clientId);
@@ -65,47 +73,41 @@ public class Message implements RamcastMessage {
         buffer.putInt(nodeId);
         buffer.putInt(LC);
 
-        return SERIALIZED_SIZE + 4*destinationSize;
+        return buffer.capacity();
     }
 
-    @Override
     public void update(ByteBuffer buffer) {
         this.msgType = buffer.getInt();
+        logger.debug("SkeenMessage: msgType: {}", msgType);
         this.clientId = buffer.getInt();
+        logger.debug("SkeenMessage: cliebtId: {}", clientId);
         this.msgId = buffer.getInt();
+        logger.debug("SkeenMessage: msgId: {}", msgId);
         this.destinationSize = buffer.getInt();
+        logger.debug("SkeenMessage: destinationSize: {}", destinationSize);
         this.destinations = new int[destinationSize];
-        for (int i=0; i<destinationSize; i++)
+        for (int i=0; i<destinationSize; i++) {
+            logger.debug("SkeenMessage: update buffer size: {}", buffer);
             this.destinations[i] = buffer.getInt();
+        }
         this.nodeId = buffer.getInt();
         this.LC = buffer.getInt();
     }
 
-    @Override
-    public void update(RamcastMessage buffer) {
-        msgType = ((Message) buffer).getMsgType();
-        clientId = ((Message) buffer).getClientId();
-        msgId = ((Message) buffer).getMsgId();
-        destinationSize = ((Message) buffer).getDestinationSize();
-        destinations = ((Message) buffer).getDestinations();
-        nodeId = ((Message) buffer).getNodeId();
-        LC = ((Message) buffer).getLC();
-
+    ByteBuffer getBuffer() {
+        return buffer;
     }
 
-    @Override
     public void stamp(int ticket) {
         this.ticket = ticket;
     }
 
-    @Override
     public int getTicket() {
         return ticket;
     }
 
-    @Override
     public int size() {
-        return SERIALIZED_SIZE + 4*destinationSize;
+        return SIZE;
     }
 
     int getMsgType() {
@@ -138,6 +140,6 @@ public class Message implements RamcastMessage {
 
     @Override
     public String toString() {
-        return clientId + ":" + msgId;
+        return "[SkeenMsg, msgType=" + msgType + " " + clientId + ":" + msgId + "]";
     }
 }
