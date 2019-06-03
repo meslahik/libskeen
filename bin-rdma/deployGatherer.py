@@ -18,7 +18,7 @@ if (len(sys.argv) not in [3]):
 
 # parameters
 gathererHost = common.SENSE_HOST
-config_mode = sarg(1)
+numServers = sarg(1)
 numClients = iarg(2)
 
 logsargs = []
@@ -31,8 +31,16 @@ logsargs.append("latency")
 logsargs.append("client_overall")
 logsargs.append(numClients)
 
+logsargs.append("throughput")
+logsargs.append("server")
+logsargs.append(numServers)
 
-directory = common.SENSE_DIRECTORY + "/skeenrdma_" + config_mode + "g_" + str(numClients)
+logsargs.append("latency")
+logsargs.append("server")
+logsargs.append(numServers)
+
+
+directory = common.SENSE_DIRECTORY + "/skeenrdma_" + str(numServers) + "g_" + str(numClients)
 
 
 cmdArgs = [common.JAVA_BIN, common.JAVA_CLASSPATH, common.javaGathererClass,

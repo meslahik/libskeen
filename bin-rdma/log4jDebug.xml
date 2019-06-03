@@ -12,14 +12,29 @@
             <!-- <param name="levelMax" value="DEBUG" /> -->
         </filter>
     </appender>
-    <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.Server" additivity="false">
-        <level value="error"/>
-        <appender-ref ref="console"/>
-    </logger>
-    <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.Configuration" additivity="false">
-        <level value="error"/>
-        <appender-ref ref="console"/>
-    </logger>
+
+    <appender name="server_out" class="org.apache.log4j.FileAppender">
+        <!-- <param name="file" value="/Users/meslahik/logs/dynastarbtreev2/local-debug/server-${HOSTNAME}.out"/> -->
+        <param name="file" value="/home/eslahm/logs/libskeen-rdma-messaging/debug/server-${HOSTNAME}.out"/>
+        <param name="immediateFlush" value="true"/>
+        <param name="threshold" value="debug"/>
+        <param name="append" value="false"/>
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="conversionPattern" value="%d{HH:mm:ss.SSS} [%-5p] - %m%n"/>
+        </layout>
+    </appender>
+
+    <appender name="client_out" class="org.apache.log4j.FileAppender">
+        <!-- <param name="file" value="/Users/meslahik/logs/dynastarbtreev2/local-debug/server-${HOSTNAME}.out"/> -->
+        <param name="file" value="/home/eslahm/logs/libskeen-rdma-messaging/debug/client-${HOSTNAME}.out"/>
+        <param name="immediateFlush" value="true"/>
+        <param name="threshold" value="debug"/>
+        <param name="append" value="false"/>
+        <layout class="org.apache.log4j.PatternLayout">
+            <param name="conversionPattern" value="%d{HH:mm:ss.SSS} [%-5p] - %m%n"/>
+        </layout>
+    </appender>
+
     <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.Process" additivity="false">
         <level value="error"/>
         <appender-ref ref="console"/>
@@ -28,10 +43,19 @@
         <level value="error"/>
         <appender-ref ref="console"/>
     </logger>
+    <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.Server" additivity="false">
+        <level value="error"/>
+        <appender-ref ref="console"/>
+    </logger>
     <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.MessageProcessor" additivity="false">
         <level value="error"/>
         <appender-ref ref="console"/>
     </logger>
+    <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.Configuration" additivity="false">
+        <level value="error"/>
+        <appender-ref ref="console"/>
+    </logger>
+
     <logger name="com.ibm.disni" additivity="false">
         <level value="error"/>
         <appender-ref ref="console"/>

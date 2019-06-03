@@ -3,14 +3,16 @@ package ch.usi.dslab.mojtaba.libskeen.rdma;
 import ch.usi.dslab.bezerra.sense.DataGatherer;
 import ch.usi.dslab.bezerra.sense.monitors.LatencyPassiveMonitor;
 import ch.usi.dslab.bezerra.sense.monitors.ThroughputPassiveMonitor;
+import ch.usi.dslab.lel.ramcast.RamcastConfig;
+import com.sun.org.apache.xpath.internal.operations.Bool;
 import org.slf4j.LoggerFactory;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
 
 public class Client extends Process {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(Client.class);
@@ -18,33 +20,62 @@ public class Client extends Process {
     LatencyPassiveMonitor latMonitor;
 
     int msgId = 0;
-    BlockingQueue<Message> receivedReply = new LinkedBlockingQueue<>();
 
-    public Client(int id, String configFile) {
+    Semaphore sendPermits;
+
+    RamcastConfig config;
+
+    boolean isGathererEnabled = false;
+
+//    public Client(int id, String configFile) {
+    public Client(int id, String configFile,
+                  int recvQueue, int sendQueue, int maxinline, int servicetimeout,
+                  int signalInterval, int wqSize, boolean polling) {
+
         super(id, false, configFile);
+
+        config = RamcastConfig.getInstance();
+        config.setRecvQueueSize(recvQueue);
+        config.setSendQueueSize(sendQueue);
+        config.setMaxinline(maxinline);
+        config.setServiceTimeout(servicetimeout);
+        config.setSignalInterval(signalInterval);
+        config.setWrQueueSize(wqSize);
+        config.setPolling(polling);
+        config.setPayloadSize(Message.size());
+
+
     }
 
     public void init(String[] args) {
-        String gathererHost = args[2];
-        int gathererPort = Integer.parseInt(args[3]);
-        String fileDirectory = args[4];
-        int experimentDuration = Integer.parseInt(args[5]);
-        int warmUpTime = Integer.parseInt(args[6]);
+        isGathererEnabled = Boolean.parseBoolean(args[2]);
+        String gathererHost = args[3];
+        int gathererPort = Integer.parseInt(args[4]);
+        String fileDirectory = args[5];
+        int experimentDuration = Integer.parseInt(args[6]);
+        int warmUpTime = Integer.parseInt(args[7]);
 
-        DataGatherer.configure(experimentDuration, fileDirectory, gathererHost, gathererPort, warmUpTime);
-
-        tpMonitor = new ThroughputPassiveMonitor(node.pid, "client_overall", true);
-        latMonitor = new LatencyPassiveMonitor(node.pid, "client_overall", true);
+        if (isGathererEnabled) {
+            DataGatherer.configure(experimentDuration, fileDirectory, gathererHost, gathererPort, warmUpTime);
+            tpMonitor = new ThroughputPassiveMonitor(node.pid, "client_overall", true);
+            latMonitor = new LatencyPassiveMonitor(node.pid, "client_overall", true);
+        }
     }
 
     public void multicast(int[] destinations) {
-        Message message = new Message(1, node.pid, ++msgId, destinations.length, destinations);
+        long sendTime = System.currentTimeMillis();
+        Message message = new Message(1, node.pid, ++msgId, destinations.length, destinations, sendTime);
 
         List<Group> destinationGroups = new ArrayList<>();
         for (int id: destinations)
             destinationGroups.add(Group.getGroup(id));
         for (Group g: destinationGroups) {
-            send(message, true, g.nodeList.get(0).pid);
+            ByteBuffer reply = (ByteBuffer) send(message, true, g.nodeList.get(0).pid);
+//            int op = reply.getInt();
+//            int clientId = reply.getInt();
+//            int messageId = reply.getInt();
+//            logger.debug("reply: {}, {}, {}", op, clientId, messageId);
+            logger.debug("reply received");
         }
         logger.debug("sent message {} to its destinations {}", message, destinations);
     }
@@ -55,74 +86,82 @@ public class Client extends Process {
         multicast(destinations);
     }
 
-//    public Message deliverReply() {
+//    public ByteBuffer deliverReply() {
 //        try {
-//            return receivedReply.take();
+//            Pair<Integer, ByteBuffer> response = responses.take();
 //        } catch (InterruptedException e) {
 //            e.printStackTrace();
 //        }
 //        return null;
 //    }
 
-//    @Override
-//    void uponDelivery(TCPMessage tcpMessage) {
-//        try {
-//            Message m = tcpMessage.getContents();
-//            logger.debug("received reply: " + m);
-//            m.rewind();
-//            receivedReply.put(m);
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
-//    }
+    void getPermit() {
+        try {
+            sendPermits.acquire();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+    }
+
+    public void releasePermit() {
+        sendPermits.release();
+    }
+
+    void runBatch() {
+        int groupSize = Group.groupSize();
+        Set<Integer> groupIDs = Group.groupIDs();
+        int[] dests = new int[groupSize];
+        Iterator<Integer> it = groupIDs.iterator();
+        int j=0;
+        while (it.hasNext())
+            dests[j++] = it.next();
+        System.out.println("groupsize: " + groupSize);
+        System.out.println("groupIDs: " + groupIDs);
+
+        for (int i=0; i < 100000000; i++) {
+//            System.out.println("i=" + i);
+            long sendTime = System.currentTimeMillis();
+            multicast(dests);
+//            Message reply = client.deliverReply(dests[0]);
+//            logger.debug("reply: {}", reply);
+            long recvTime = System.currentTimeMillis();
+            if (isGathererEnabled) {
+                tpMonitor.incrementCount();
+                latMonitor.logLatency(sendTime, recvTime);
+            }
+        }
+    }
+
 
     public static void main(String[] args) {
         int clientId = Integer.parseInt(args[0]);
         String configFile = args[1];
 
-        int threadCount = 1;
-        int connections = 1;
-        int recvQueue = 100;
-        int sendQueue = 100;
-        int loop = 100000;
+        int poolsize = 1;
+        int recvQueue = 1000;
+        int sendQueue = 1000;
+        int wqSize = 1;
+        int servicetimeout = 0;
+        boolean polling = true;
         int maxinline = 0;
-        int batchSize = 1;
-        int clienttimeout = 3;
-        int size = 24;
-        String host = "192.168.4.1";
-        int port = 9999;
+        int signalInterval = 1;
 
-        Client client = new Client(clientId, configFile);
+
+//        Client client = new Client(clientId, configFile);
+        Client client = new Client(clientId, configFile, recvQueue, sendQueue, maxinline, servicetimeout,
+                signalInterval, wqSize, polling);
+
         client.init(args);
         client.startRunning(sendQueue, recvQueue, maxinline, clientId);
         System.out.println("client " + client.node.pid + " started");
 
-        int groupSize = Group.groupSize();
-        Set<Integer> groupIDs = Group.groupIDs();
-        int[] dests = new int[groupSize];
-
-        Iterator<Integer> it = groupIDs.iterator();
-        int j=0;
-        while (it.hasNext())
-            dests[j++] = it.next();
-
-        System.out.println("groupsize: " + groupSize);
-        System.out.println("groupIDs: " + groupIDs);
-
 
 //        logger.debug("sending message ...");
 //        client.multicast(dests);
 //        logger.debug("sending message ...");
 //        client.multicast(dests);
 
-        for (int i=0; i < 1000000000; i++) {
-            long sendTime = System.currentTimeMillis();
-            client.multicast(dests);
-            Message reply = client.deliverReply(dests[0]);
-            logger.debug("reply: {}", reply);
-            long recvTime = System.currentTimeMillis();
-            client.tpMonitor.incrementCount();;
-            client.latMonitor.logLatency(sendTime, recvTime);
-        }
+        client.runBatch();
     }
 }
