@@ -2,6 +2,7 @@ package ch.usi.dslab.mojtaba.libskeen.rdma;
 
 import ch.usi.dslab.bezerra.netwrapper.tcp.*;
 import ch.usi.dslab.bezerra.sense.datapoints.TimelineDataPoint;
+import ch.usi.dslab.lel.ramcast.RamcastFuture;
 import ch.usi.dslab.lel.ramcast.RamcastSender;
 import javafx.util.Pair;
 import org.slf4j.LoggerFactory;
@@ -12,7 +13,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 
-public abstract class Process implements Runnable {
+public abstract class Process {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(Process.class);
 
     Node node;
@@ -34,7 +35,7 @@ public abstract class Process implements Runnable {
         }
     }
 
-    public void startRunning(int sendQueue, int recvQueue, int maxinline, int clienttimeout) {
+    public void startRunning(int sendQueue, int recvQueue, int maxinline) {
         running = true;
         logger.debug("Process {} started running", node.pid);
         try {
@@ -42,14 +43,11 @@ public abstract class Process implements Runnable {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        createConnections(sendQueue, recvQueue, maxinline, clienttimeout);
-
-//        Thread deliverer = new Thread(this, "Deliverer-" + node.pid);
-//        deliverer.start();
-//        logger.debug("deliverer started");
+//        if (!listenForConnections)
+        createConnections(sendQueue, recvQueue, maxinline);
     }
 
-    public void createConnections(int sendQueue, int recvQueue, int maxinline, int clienttimeout) {
+    public void createConnections(int sendQueue, int recvQueue, int maxinline) {
         // once done loading the processes, start a thread here that will keep trying to connect to each
         // learner/coordinator. exceptions are likely to be thrown, as processes start at different times, but keep
         // trying, until the client is connected to all coordinators (TODO: to all learners, in case of fast opt).
@@ -58,15 +56,15 @@ public abstract class Process implements Runnable {
         // would be used. but that would be an over-optimization, done only if this library is ever published.
 
         for (Node node : Node.nodeMap.values()) {
-            connect(node, sendQueue, recvQueue, maxinline, clienttimeout);
+            connect(node, sendQueue, recvQueue, maxinline);
         }
         System.out.println("Process " + node.pid + ": All senders created!");
     }
 
-    public boolean connect(Node node, int sendQueue, int recvQueue, int maxinline, int clienttimeout) {
+    public boolean connect(Node node, int sendQueue, int recvQueue, int maxinline) {
 //        logger.debug("creating sender for host {}", node.host);
         RamcastSender sender =
-                new RamcastSender(node.host, node.port, sendQueue,recvQueue, maxinline, clienttimeout);
+                new RamcastSender(node.host, node.port, sendQueue,recvQueue, maxinline);
         logger.debug("sender created for {}", node.host);
 
         senders.put(node.pid, sender);
@@ -77,23 +75,12 @@ public abstract class Process implements Runnable {
         return senders.get(nodeId).send(msg.getBuffer(), expectReply);
     }
 
+    RamcastFuture sendNonBlocking(Message msg, boolean expectReply, int nodeId) {
+        return senders.get(nodeId).sendNonBlocking(msg.getBuffer(), expectReply);
+    }
 
-//    Buffer deliverReply(int nodeId) {
-//        RamcastSender sender = senders.get(nodeId);
-//        return sender.deliverReply();
-//    }
 
-    @Override
-    public void run() {
-//        int size = senders.size();
-//        for (int i = 0; true; i++) {
-//            int senderId = i % size;
-//            ByteBuffer reply = senders.get(senderId).deliverReply();
-//            try {
-//                responses.put(new Pair<>(i, reply));
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//        }
+    Buffer deliverReply(int nodeId) {
+        return senders.get(nodeId).deliverReply();
     }
 }

@@ -13,12 +13,11 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class Server extends Process {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(Server.class);
 
-    // TODO needs to be Atomic?
-    int LC = 0;
+    int LC = 0; //TODO: needs to be Atomic?
 
     RamcastReceiver agent;
     MessageProcessor messageProcessor;
-    public BlockingQueue<Pair<Integer, Integer>> atomicDeliver = new LinkedBlockingQueue<>();
+    BlockingQueue<Pair<Integer, Integer>> atomicDeliver = new LinkedBlockingQueue<>();
 
     RamcastConfig config;
 
@@ -56,11 +55,6 @@ public class Server extends Process {
         return null;
     }
 
-//    @Override
-//    void uponDelivery(TCPMessage tcpMessage) {
-//
-//    }
-
     public static void main(String[] args) {
         int serverId = Integer.parseInt(args[0]);
         String configFile = args[1];
@@ -73,11 +67,13 @@ public class Server extends Process {
         int warmUpTime = Integer.parseInt(args[7]);
 
         int poolsize = 1;
-        int recvQueue = 1000;
-        int sendQueue = 1000;
+        int recvQueue = 100;
+        int sendQueue = 100;
         int wqSize = 1;
-        int servicetimeout = 0;
-        boolean polling = true;
+        // all endpoints (the receiver and all senders) use this timeout =>
+        //  cmProcessor events timeout (receiver and senders); cqProcessor (receiver) event timeout when polling is false
+        int servicetimeout = 1; //millisecond
+        boolean polling = true; //receiver
         int maxinline = 0;
         int signalInterval = 1;
 
@@ -85,7 +81,7 @@ public class Server extends Process {
         Server server = new Server(serverId, configFile,
                 poolsize, recvQueue, sendQueue, wqSize, servicetimeout, polling, maxinline, signalInterval,
                 isGathererEnabled, gathererHost, gathererPort, fileDirectory, experimentDuration, warmUpTime);
-        logger.debug("server {} is start running", serverId);
-        server.startRunning(sendQueue, recvQueue, maxinline, servicetimeout);
+        server.startRunning(sendQueue, recvQueue, maxinline);
+        System.out.println("server " + serverId + " started running");
     }
 }

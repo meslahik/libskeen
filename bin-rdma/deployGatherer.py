@@ -31,13 +31,13 @@ logsargs.append("latency")
 logsargs.append("client_overall")
 logsargs.append(numClients)
 
-logsargs.append("throughput")
-logsargs.append("server")
-logsargs.append(numServers)
+# logsargs.append("throughput")
+# logsargs.append("server")
+# logsargs.append(numServers)
 
-logsargs.append("latency")
-logsargs.append("server")
-logsargs.append(numServers)
+# logsargs.append("latency")
+# logsargs.append("server")
+# logsargs.append(numServers)
 
 
 directory = common.SENSE_DIRECTORY + "/skeenrdma_" + str(numServers) + "g_" + str(numClients)

@@ -10,13 +10,19 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
 
 public class MessageProcessor implements ServerEventCallback {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(MessageProcessor.class);
 
     ThroughputPassiveMonitor tpMonitor;
     LatencyPassiveMonitor latMonitor;
+
+//    LinkedBlockingQueue<Pair<Message, RamcastServerEvent>> step1PendingEvents = new LinkedBlockingQueue();
+//    LinkedBlockingQueue<Pair<Message, RamcastServerEvent>> step2PendingEvents = new LinkedBlockingQueue();
+
+//    ConcurrentLinkedQueue<Pair<Message, RamcastServerEvent>> step1PendingEvents = new ConcurrentLinkedQueue();
+//    ConcurrentLinkedQueue<Pair<Message, RamcastServerEvent>> step2PendingEvents = new ConcurrentLinkedQueue();
 
     class Pending {
         int clientId;
@@ -56,8 +62,42 @@ public class MessageProcessor implements ServerEventCallback {
     private Map<Pair<Integer, Integer>, ArrayList<Pending>> pendingMsgs = new ConcurrentHashMap<>();
     private TreeMap<Integer, Pending> ordered = new TreeMap<>();
 
-//    private Map<Pair<Integer, Integer>, RamcastServerEvent> waitingEvents = new ConcurrentHashMap<>();
-//    static Map<Pair<Integer, Integer>, RamcastSender> messageConnectionMap = new HashMap<>();
+    private Map<Pair<Integer, Integer>, RamcastServerEvent> waitingEvents = new ConcurrentHashMap<>();
+
+//    ExecutorService step1Executor = Executors.newFixedThreadPool(1);
+//    ExecutorService step2Executor = Executors.newFixedThreadPool(1);
+//
+//    Runnable step1Processor = () -> {
+//        while(true) {
+//            try {
+////                    Pair pair = step1PendingEvents.take();
+//                Pair pair = null;
+//                while(pair == null)
+//                    pair = step1PendingEvents.poll();
+//                Message msg = (Message) pair.getKey();
+//                RamcastServerEvent event = (RamcastServerEvent) pair.getValue();
+//                processStep1Message(msg, event);
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//            }
+//        }
+//    };
+//
+//    Runnable step2Processor = () -> {
+//        while(true) {
+//            try {
+////                    Pair pair = step2PendingEvents.take();
+//                Pair pair = null;
+//                while(pair == null)
+//                    pair = step2PendingEvents.poll();
+//                Message msg = (Message) pair.getKey();
+//                RamcastServerEvent event = (RamcastServerEvent) pair.getValue();
+//                processStep2Message(msg, event);
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//            }
+//        }
+//    };
 
     MessageProcessor(Server server,
                      boolean isGathererEnabled, String gathererHost, int gathererPort, String fileDirectory, int experimentDuration, int warmUpTime) {
@@ -124,16 +164,16 @@ public class MessageProcessor implements ServerEventCallback {
                     latMonitor.logLatency(pending.sendTime, System.currentTimeMillis());
                 }
 
-//                Message reply = new Message(3, pending.clientId, pending.msgId);
-//                RamcastServerEvent event = waitingEvents.get(deliverPair);
-//                event.setSendBuffer(reply.getBuffer());
-//                try {
-//                    event.triggerResponse();
-//                } catch (Exception e) {
-//                    e.printStackTrace();
-//                }
-//                logger.debug("reply sent to the client");
-//                waitingEvents.remove(deliverPair);
+                Message reply = new Message(3, pending.clientId, pending.msgId);
+                RamcastServerEvent event = waitingEvents.get(deliverPair);
+                event.setSendBuffer(reply.getBuffer());
+                try {
+                    event.triggerResponse();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                logger.debug("reply sent to the client");
+                waitingEvents.remove(deliverPair);
             } else {
                 break;
             }
@@ -163,7 +203,7 @@ public class MessageProcessor implements ServerEventCallback {
 
         Pending p = new Pending(clientId, messageId, nodeId, lc, destinationSize, destinations, sendTime);
         server.LC = Math.max(server.LC, p.LC);
-        Pair<Integer, Integer> pair = new Pair<Integer, Integer>(p.clientId, p.msgId);
+        Pair<Integer, Integer> pair = new Pair<>(p.clientId, p.msgId);
         if (pendingMsgs.containsKey(pair))
             pendingMsgs.get(pair).add(p);
         else {
@@ -183,29 +223,31 @@ public class MessageProcessor implements ServerEventCallback {
         long sendTime = message.getSendTime();
         logger.debug("received STEP1 message {} from {}", message, clientId);
 
-//        Pair<Integer, Integer> pair = new Pair<>(clientId, messageId);
-//        waitingEvents.put(pair, event);
+        Pair<Integer, Integer> pair = new Pair<>(clientId, messageId);
+        waitingEvents.put(pair, event);
 
-        // reply is needed to be sent back to the server that sent this message
-        Message reply = new Message(3, clientId, messageId);
-        event.setSendBuffer(reply.getBuffer());
-        try {
-            event.triggerResponse();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        logger.debug("ACK message sent back to the client {}", clientId);
-
+////        // reply is needed to be sent back to the server that sent this message
+//        Message reply = new Message(3, clientId, messageId);
+//        event.setSendBuffer(reply.getBuffer());
+//        try {
+//            event.triggerResponse();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//        logger.debug("ACK message sent back to the client {}", clientId);
 
         Message newMessage = new Message(2, clientId, messageId, destinationSize, destinations, sendTime, server.node.pid, ++server.LC);
 
         List<Group> destinationGroups = new ArrayList<>();
         for (int id: destinations)
             destinationGroups.add(Group.getGroup(id));
+        logger.debug("destination size for msgType 2: {}", destinationGroups.size());
         for (Group g: destinationGroups) {
-            server.send(newMessage, true, g.nodeList.get(0).pid);
+//            server.send(newMessage, true, g.nodeList.get(0).pid);
+            server.sendNonBlocking(newMessage, true, g.nodeList.get(0).pid);
             logger.debug("sent message {} to server {}", newMessage, g.nodeList.get(0));
         }
+        logger.debug("Step1 message processed");
     }
 
     @Override
@@ -228,4 +270,40 @@ public class MessageProcessor implements ServerEventCallback {
                 // ack message for receiving
         }
     }
+
+//    // threads for processing different message types
+//    @Override
+//    public void call(RamcastServerEvent event) {
+//        ByteBuffer buffer = event.getReceiveBuffer();
+//        Message m = new Message();
+//        m.update(buffer);
+//
+//        int type = m.getMsgType();
+//        switch (type) {
+//            case 1:
+////                int clientId = m.getClientId();
+////                int messageId = m.getMsgId();
+////                messageConnectionMap.put(new Pair<>(clientId, messageId), connection);
+////                processStep1Message(m, event);
+//                try {
+//                    logger.debug("routing step1 message");
+//                    step1PendingEvents.put(new Pair<>(m, event));
+////                    step1PendingEvents.add(new Pair<>(m, event));
+//                } catch (Exception e) {
+//                    e.printStackTrace();
+//                }
+//                break;
+//            case 2:
+//                try {
+//                    logger.debug("routing step2 message");
+//                    step2PendingEvents.put(new Pair<>(m, event));
+////                    step2PendingEvents.add(new Pair<>(m, event));
+//                } catch (Exception e) {
+//                    e.printStackTrace();
+//                }
+//            case 3:
+//                // ack message for receiving
+//        }
+//    }
+
 }

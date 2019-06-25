@@ -4,28 +4,22 @@ import ch.usi.dslab.bezerra.sense.DataGatherer;
 import ch.usi.dslab.bezerra.sense.monitors.LatencyPassiveMonitor;
 import ch.usi.dslab.bezerra.sense.monitors.ThroughputPassiveMonitor;
 import ch.usi.dslab.lel.ramcast.RamcastConfig;
-import com.sun.org.apache.xpath.internal.operations.Bool;
 import org.slf4j.LoggerFactory;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.Semaphore;
 
 public class Client extends Process {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(Client.class);
-    ThroughputPassiveMonitor tpMonitor;
-    LatencyPassiveMonitor latMonitor;
 
     int msgId = 0;
-
-    Semaphore sendPermits;
-
     RamcastConfig config;
-
     boolean isGathererEnabled = false;
+
+    ThroughputPassiveMonitor tpMonitor;
+    LatencyPassiveMonitor latMonitor;
 
 //    public Client(int id, String configFile) {
     public Client(int id, String configFile,
@@ -62,15 +56,24 @@ public class Client extends Process {
         }
     }
 
-    public void multicast(int[] destinations) {
+    int[] destinations;
+    List<Group> destinationGroups;
+
+    void setDestinations(int[] destinations) {
+        this.destinations = destinations;
+        destinationGroups = new ArrayList<>();
+        for (int id: destinations)
+            destinationGroups.add(Group.getGroup(id));
+    }
+
+    public void multicast() {
         long sendTime = System.currentTimeMillis();
         Message message = new Message(1, node.pid, ++msgId, destinations.length, destinations, sendTime);
 
-        List<Group> destinationGroups = new ArrayList<>();
-        for (int id: destinations)
-            destinationGroups.add(Group.getGroup(id));
         for (Group g: destinationGroups) {
-            ByteBuffer reply = (ByteBuffer) send(message, true, g.nodeList.get(0).pid);
+            logger.debug("sending message {}", message);
+            sendNonBlocking(message, true, g.nodeList.get(0).pid);
+//            ByteBuffer reply = (ByteBuffer) send(message, false, g.nodeList.get(0).pid);
 //            int op = reply.getInt();
 //            int clientId = reply.getInt();
 //            int messageId = reply.getInt();
@@ -78,34 +81,6 @@ public class Client extends Process {
             logger.debug("reply received");
         }
         logger.debug("sent message {} to its destinations {}", message, destinations);
-    }
-
-    public void multicast(int groupID) {
-        int[] destinations = new int[1];
-        destinations[0] = groupID;
-        multicast(destinations);
-    }
-
-//    public ByteBuffer deliverReply() {
-//        try {
-//            Pair<Integer, ByteBuffer> response = responses.take();
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
-//        return null;
-//    }
-
-    void getPermit() {
-        try {
-            sendPermits.acquire();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-            System.exit(1);
-        }
-    }
-
-    public void releasePermit() {
-        sendPermits.release();
     }
 
     void runBatch() {
@@ -116,20 +91,25 @@ public class Client extends Process {
         int j=0;
         while (it.hasNext())
             dests[j++] = it.next();
+        setDestinations(dests);
         System.out.println("groupsize: " + groupSize);
         System.out.println("groupIDs: " + groupIDs);
 
         for (int i=0; i < 100000000; i++) {
-//            System.out.println("i=" + i);
             long sendTime = System.currentTimeMillis();
-            multicast(dests);
-//            Message reply = client.deliverReply(dests[0]);
-//            logger.debug("reply: {}", reply);
+            multicast();
+            for (int k =0; k < dests.length; k++)
+                deliverReply(dests[k]);
             long recvTime = System.currentTimeMillis();
             if (isGathererEnabled) {
                 tpMonitor.incrementCount();
                 latMonitor.logLatency(sendTime, recvTime);
             }
+//            try {
+//                Thread.sleep(10);
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//            }
         }
     }
 
@@ -139,11 +119,11 @@ public class Client extends Process {
         String configFile = args[1];
 
         int poolsize = 1;
-        int recvQueue = 1000;
-        int sendQueue = 1000;
+        int recvQueue = 100;
+        int sendQueue = 100;
         int wqSize = 1;
-        int servicetimeout = 0;
-        boolean polling = true;
+        int servicetimeout = 1; //millisecond
+        boolean polling = true; // not used for clients
         int maxinline = 0;
         int signalInterval = 1;
 
@@ -153,7 +133,7 @@ public class Client extends Process {
                 signalInterval, wqSize, polling);
 
         client.init(args);
-        client.startRunning(sendQueue, recvQueue, maxinline, clientId);
+        client.startRunning(sendQueue, recvQueue, maxinline);
         System.out.println("client " + client.node.pid + " started");
 
 
@@ -161,7 +141,6 @@ public class Client extends Process {
 //        client.multicast(dests);
 //        logger.debug("sending message ...");
 //        client.multicast(dests);
-
         client.runBatch();
     }
 }
