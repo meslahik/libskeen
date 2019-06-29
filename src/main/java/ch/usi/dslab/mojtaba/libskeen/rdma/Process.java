@@ -1,11 +1,15 @@
 package ch.usi.dslab.mojtaba.libskeen.rdma;
 
+import ch.usi.dslab.lel.ramcast.RamcastFuture;
 import ch.usi.dslab.lel.ramcast.RamcastSender;
+import javafx.util.Pair;
 import org.slf4j.LoggerFactory;
 
 import java.nio.Buffer;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public abstract class Process {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(Process.class);
@@ -16,20 +20,20 @@ public abstract class Process {
     boolean listenForConnections;
     boolean running;
 
+    LinkedBlockingQueue<Pair<Integer, ByteBuffer>> responses = new LinkedBlockingQueue<>();
+
     public Process(int id, boolean isServer, String configFile) {
         Configuration.loadConfig(configFile);
         if (isServer) {
             node = Node.getNode(id);
-//            pidsIndex.put(node.pid, this);
             listenForConnections = true;
         } else {
             node = new Node(id, false);
-//            pidsIndex.put(node.pid, this);
             listenForConnections = false;
         }
     }
 
-    public void startRunning(int sendQueue, int recvQueue, int maxinline, int clienttimeout) {
+    public void startRunning(int sendQueue, int recvQueue, int maxinline) {
         running = true;
         logger.debug("Process {} started running", node.pid);
         try {
@@ -38,10 +42,10 @@ public abstract class Process {
             e.printStackTrace();
         }
         if (!listenForConnections || node.isLeader)
-            createConnections(sendQueue, recvQueue, maxinline, clienttimeout);
+            createConnections(sendQueue, recvQueue, maxinline);
     }
 
-    public void createConnections(int sendQueue, int recvQueue, int maxinline, int clienttimeout) {
+    public void createConnections(int sendQueue, int recvQueue, int maxinline) {
         // once done loading the processes, start a thread here that will keep trying to connect to each
         // learner/coordinator. exceptions are likely to be thrown, as processes start at different times, but keep
         // trying, until the client is connected to all coordinators (TODO: to all learners, in case of fast opt).
@@ -50,16 +54,16 @@ public abstract class Process {
         // would be used. but that would be an over-optimization, done only if this library is ever published.
 
         for (Group group: Group.groupList.values()) {
-            connect(group.nodeList.get(0), sendQueue, recvQueue, maxinline, clienttimeout);
+            connect(group.nodeList.get(0), sendQueue, recvQueue, maxinline);
         }
         System.out.println("Process " + node.pid + ": All senders created!");
     }
 
-    public boolean connect(Node node, int sendQueue, int recvQueue, int maxinline, int clienttimeout) {
-//        logger.debug("connecting to node {} port {}", node.host, node.port);
+    public boolean connect(Node node, int sendQueue, int recvQueue, int maxinline) {
+//        logger.debug("creating sender for host {}", node.host);
         RamcastSender sender =
-                new RamcastSender(node.host, node.port, sendQueue,recvQueue, maxinline, clienttimeout);
-        logger.debug("sender created for {}, port {}", node.host, node.port);
+                new RamcastSender(node.host, node.port, sendQueue,recvQueue, maxinline);
+        logger.debug("sender created for {}", node.host);
 
         senders.put(node.pid, sender);
         return true;
@@ -69,8 +73,11 @@ public abstract class Process {
         return senders.get(nodeId).send(msg.getBuffer(), expectReply);
     }
 
-//    SkeenMessage deliverReply(int nodeId) {
-//        return (SkeenMessage) senders.get(nodeId).deliverReply();
-//    }
+    RamcastFuture sendNonBlocking(SkeenMessage msg, boolean expectReply, int nodeId) {
+        return senders.get(nodeId).sendNonBlocking(msg.getBuffer(), expectReply);
+    }
 
+    Buffer deliverReply(int nodeId) {
+        return senders.get(nodeId).deliverReply();
+    }
 }

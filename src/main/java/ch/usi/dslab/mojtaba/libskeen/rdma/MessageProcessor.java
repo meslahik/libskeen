@@ -1,26 +1,38 @@
 package ch.usi.dslab.mojtaba.libskeen.rdma;
 
-import ch.usi.dslab.lel.ramcast.RamcastServerEvent;
+import ch.usi.dslab.bezerra.sense.DataGatherer;
+import ch.usi.dslab.bezerra.sense.monitors.LatencyPassiveMonitor;
+import ch.usi.dslab.bezerra.sense.monitors.ThroughputPassiveMonitor;
 import ch.usi.dslab.lel.ramcast.ServerEventCallback;
+import ch.usi.dslab.lel.ramcast.RamcastServerEvent;
 import javafx.util.Pair;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
 
 public class MessageProcessor implements ServerEventCallback {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(MessageProcessor.class);
+
+    ThroughputPassiveMonitor tpMonitor;
+    LatencyPassiveMonitor latMonitor;
+
+//    LinkedBlockingQueue<Pair<Message, RamcastServerEvent>> step1PendingEvents = new LinkedBlockingQueue();
+//    LinkedBlockingQueue<Pair<Message, RamcastServerEvent>> step2PendingEvents = new LinkedBlockingQueue();
+
+//    ConcurrentLinkedQueue<Pair<Message, RamcastServerEvent>> step1PendingEvents = new ConcurrentLinkedQueue();
+//    ConcurrentLinkedQueue<Pair<Message, RamcastServerEvent>> step2PendingEvents = new ConcurrentLinkedQueue();
 
     class Pending {
         int clientId;
         int msgId;
         int destinationSize;
         int[] destination;
+        long sendTime;
         int nodeId;
         int LC;
         SkeenMessage message;
-
 
         public Pending(int clientId, int msgId, int nodeId, int LC, int destinationSize, int[] destination, SkeenMessage skeenMessage) {
             this.clientId = clientId;
@@ -59,17 +71,27 @@ public class MessageProcessor implements ServerEventCallback {
 
     Server server;
     Replica replica;
+    boolean isGathererEnabled;
 
     private Map<Pair<Integer, Integer>, ArrayList<Pending>> pendingMsgs = new ConcurrentHashMap<>();
-    private Map<Pair<Integer, Integer>, RamcastServerEvent> waitingEvents = new ConcurrentHashMap<>();
     private TreeMap<Integer, Pending> ordered = new TreeMap<>();
 
-    MessageProcessor(Server server, Replica replica) {
+    private Map<Pair<Integer, Integer>, RamcastServerEvent> waitingEvents = new ConcurrentHashMap<>();
+
+    MessageProcessor(Server server, Replica replica,
+                     boolean isGathererEnabled, String gathererHost, int gathererPort, String fileDirectory, int experimentDuration, int warmUpTime) {
         this.server = server;
         this.replica = replica;
 
         Thread consensusDeliverer = new Thread(new ConsensusDeliverer(), "ConsensusDeliverer-" + server.node.pid);
         consensusDeliverer.start();
+
+        this.isGathererEnabled = isGathererEnabled;
+        if (isGathererEnabled) {
+            DataGatherer.configure(experimentDuration, fileDirectory, gathererHost, gathererPort, warmUpTime);
+            tpMonitor = new ThroughputPassiveMonitor(server.node.pid, "server", true);
+            latMonitor = new LatencyPassiveMonitor(server.node.pid, "server", true);
+        }
     }
 
     private void processMaxLCMessages(SkeenMessage skeenMessage) {
@@ -110,18 +132,23 @@ public class MessageProcessor implements ServerEventCallback {
                 server.atomicDeliver.add(deliverPair);
                 logger.debug("atomic decide message {}-{}:{}", minOrderedLC, pending.clientId, pending.msgId);
 
-//                SkeenMessage reply = new SkeenMessage(3, pending.clientId, pending.msgId);
-//                RamcastServerEvent event = waitingEvents.get(deliverPair);
-//                if (event != null) {
-//                    event.setSendBuffer(reply.getBuffer());
-//                    try {
-//                        event.triggerResponse();
-//                    } catch (Exception e) {
-//                        e.printStackTrace();
-//                    }
-//                    logger.debug("reply sent to the client");
-//                    waitingEvents.remove(deliverPair);
-//                }
+                if (isGathererEnabled) {
+                    tpMonitor.incrementCount();
+                    latMonitor.logLatency(pending.sendTime, System.currentTimeMillis());
+                }
+
+                SkeenMessage reply = new SkeenMessage(3, pending.clientId, pending.msgId);
+                RamcastServerEvent event = waitingEvents.get(deliverPair);
+                if (event != null) {
+                    event.setSendBuffer(reply.getBuffer());
+                    try {
+                        event.triggerResponse();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    logger.debug("reply sent to the client");
+                    waitingEvents.remove(deliverPair);
+                }
             } else {
                 break;
             }
@@ -218,6 +245,7 @@ public class MessageProcessor implements ServerEventCallback {
                 logger.debug("received STEP2 message {}", m);
                 processMaxLCMessages(m);
         }
+        logger.debug("Step1 message processed");
     }
 
     // only leader processes receive these messages. clients send to leaders; leaders also send to leaders
@@ -240,9 +268,46 @@ public class MessageProcessor implements ServerEventCallback {
                 replica.propose(m);
                 break;
             case 2:
-//                logger.debug("received STEP2 message {}", m);
                 processStep2Message(m, event);
+            case 3:
+                // ack message for receiving
         }
         event.setFree();
     }
+
+//    // threads for processing different message types
+//    @Override
+//    public void call(RamcastServerEvent event) {
+//        ByteBuffer buffer = event.getReceiveBuffer();
+//        Message m = new Message();
+//        m.update(buffer);
+//
+//        int type = m.getMsgType();
+//        switch (type) {
+//            case 1:
+////                int clientId = m.getClientId();
+////                int messageId = m.getMsgId();
+////                messageConnectionMap.put(new Pair<>(clientId, messageId), connection);
+////                processStep1Message(m, event);
+//                try {
+//                    logger.debug("routing step1 message");
+//                    step1PendingEvents.put(new Pair<>(m, event));
+////                    step1PendingEvents.add(new Pair<>(m, event));
+//                } catch (Exception e) {
+//                    e.printStackTrace();
+//                }
+//                break;
+//            case 2:
+//                try {
+//                    logger.debug("routing step2 message");
+//                    step2PendingEvents.put(new Pair<>(m, event));
+////                    step2PendingEvents.add(new Pair<>(m, event));
+//                } catch (Exception e) {
+//                    e.printStackTrace();
+//                }
+//            case 3:
+//                // ack message for receiving
+//        }
+//    }
+
 }

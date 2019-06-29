@@ -59,7 +59,7 @@ public class Replica {
 
     public boolean connect(Replica replica, int sendQueue, int recvQueue, int maxinline, int clienttimeout) {
         RamcastSender sender =
-                new RamcastSender(replica.host, replica.port, sendQueue,recvQueue, maxinline, clienttimeout);
+                new RamcastSender(replica.host, replica.port, sendQueue,recvQueue, maxinline);
         logger.debug("sender created for {}, {}", replica.host, replica.port);
 
         senders.put(replica.pid, sender);

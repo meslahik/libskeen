@@ -17,15 +17,14 @@ import java.util.concurrent.Semaphore;
 
 public class Client extends Process {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(Client.class);
-//    ThroughputPassiveMonitor tpMonitor;
-//    LatencyPassiveMonitor latMonitor;
+    ThroughputPassiveMonitor tpMonitor;
+    LatencyPassiveMonitor latMonitor;
 
     Semaphore sendPermits;
 
-    RamcastConfig config;
-
     int msgId = 0;
-    BlockingQueue<SkeenMessage> receivedReply = new LinkedBlockingQueue<>();
+    RamcastConfig config;
+    boolean isGathererEnabled = false;
 
     public Client(int id, String configFile,
                   int recvQueue, int sendQueue, int maxinline, int servicetimeout,
@@ -44,56 +43,75 @@ public class Client extends Process {
     }
 
     public void init(String[] args) {
-//        String gathererHost = args[2];
-//        int gathererPort = Integer.parseInt(args[3]);
-//        String fileDirectory = args[4];
-//        int experimentDuration = Integer.parseInt(args[5]);
-//        int warmUpTime = Integer.parseInt(args[6]);
-//
-//        DataGatherer.configure(experimentDuration, fileDirectory, gathererHost, gathererPort, warmUpTime);
-//
-//        tpMonitor = new ThroughputPassiveMonitor(node.pid, "client_overall", true);
-//        latMonitor = new LatencyPassiveMonitor(node.pid, "client_overall", true);
+        isGathererEnabled = Boolean.parseBoolean(args[2]);
+        String gathererHost = args[3];
+        int gathererPort = Integer.parseInt(args[4]);
+        String fileDirectory = args[5];
+        int experimentDuration = Integer.parseInt(args[6]);
+        int warmUpTime = Integer.parseInt(args[7]);
+
+        if (isGathererEnabled) {
+            DataGatherer.configure(experimentDuration, fileDirectory, gathererHost, gathererPort, warmUpTime);
+            tpMonitor = new ThroughputPassiveMonitor(node.pid, "client_overall", true);
+            latMonitor = new LatencyPassiveMonitor(node.pid, "client_overall", true);
+        }
     }
 
-    public void multicast(int[] destinations) {
-        SkeenMessage skeenMessage = new SkeenMessage(1, node.pid, ++msgId, destinations.length, destinations);
+    int[] destinations;
+    List<Group> destinationGroups;
 
-        List<Group> destinationGroups = new ArrayList<>();
+    void setDestinations(int[] destinations) {
+        this.destinations = destinations;
+        destinationGroups = new ArrayList<>();
         for (int id: destinations)
             destinationGroups.add(Group.getGroup(id));
+    }
+
+    public void multicast() {
+        SkeenMessage skeenMessage = new SkeenMessage(1, node.pid, ++msgId, destinations.length, destinations);
+
         for (Group g: destinationGroups) {
-            ByteBuffer buffer = (ByteBuffer) send(skeenMessage, false, g.nodeList.get(0).pid);
+            logger.debug("sending message {}", skeenMessage);
+            sendNonBlocking(skeenMessage, true, g.nodeList.get(0).pid);
+//            ByteBuffer reply = (ByteBuffer) send(message, false, g.nodeList.get(0).pid);
+//            int op = reply.getInt();
+//            int clientId = reply.getInt();
+//            int messageId = reply.getInt();
+//            logger.debug("reply: {}, {}, {}", op, clientId, messageId);
+            logger.debug("reply received");
         }
         logger.debug("sent skeenMessage {} to its destinations {}", skeenMessage, destinations);
     }
 
-    public void multicast(int groupID) {
-        int[] destinations = new int[1];
-        destinations[0] = groupID;
-        multicast(destinations);
+    void runBatch() {
+        int groupSize = Group.groupSize();
+        Set<Integer> groupIDs = Group.groupIDs();
+        int[] dests = new int[groupSize];
+        Iterator<Integer> it = groupIDs.iterator();
+        int j=0;
+        while (it.hasNext())
+            dests[j++] = it.next();
+        setDestinations(dests);
+        System.out.println("groupsize: " + groupSize);
+        System.out.println("groupIDs: " + groupIDs);
+
+        for (int i=0; i < 100000000; i++) {
+            long sendTime = System.currentTimeMillis();
+            multicast();
+            for (int k =0; k < dests.length; k++)
+                deliverReply(dests[k]);
+            long recvTime = System.currentTimeMillis();
+            if (isGathererEnabled) {
+                tpMonitor.incrementCount();
+                latMonitor.logLatency(sendTime, recvTime);
+            }
+//            try {
+//                Thread.sleep(10);
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//            }
+        }
     }
-
-//    public SkeenMessage deliverReply() {
-//        try {
-//            return receivedReply.take();
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
-//        return null;
-//    }
-
-//    @Override
-//    void uponDelivery(TCPMessage tcpMessage) {
-//        try {
-//            SkeenMessage m = tcpMessage.getContents();
-//            logger.debug("received reply: " + m);
-//            m.rewind();
-//            receivedReply.put(m);
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
-//    }
 
     void getPermit() {
         try {
@@ -115,46 +133,25 @@ public class Client extends Process {
         int poolsize = 1;
         int recvQueue = 100;
         int sendQueue = 100;
-        int wqSize = recvQueue;
-        int servicetimeout = 0;
-        boolean polling = false;
-        int maxinline = 0;
-        int signalInterval = 1;
+            int wqSize = 1;
+            int servicetimeout = 1; //millisecond
+            boolean polling = true; // not used for clients
+            int maxinline = 0;
+            int signalInterval = 1;
 
 
 
         Client client = new Client(clientId, configFile, recvQueue, sendQueue, maxinline, servicetimeout,
                 signalInterval, wqSize, polling);
         client.init(args);
-        client.startRunning(sendQueue, recvQueue, maxinline, clientId);
+        client.startRunning(sendQueue, recvQueue, maxinline);
         System.out.println("client " + client.node.pid + " started");
 
-        int groupSize = Group.groupSize();
-        Set<Integer> groupIDs = Group.groupIDs();
-        int[] dests = new int[groupSize];
-
-        Iterator<Integer> it = groupIDs.iterator();
-        int j=0;
-        while (it.hasNext())
-            dests[j++] = it.next();
-
-//        System.out.println("groupsize: " + groupSize);
-//        System.out.println("groupIDs: " + groupIDs);
-
 
 //        logger.debug("sending message ...");
 //        client.multicast(dests);
 //        logger.debug("sending message ...");
 //        client.multicast(dests);
-
-        for (int i=0; i < 2; i++) {
-//            long sendTime = System.currentTimeMillis();
-            client.multicast(dests);
-//            SkeenMessage reply = client.deliverReply(dests[0]);
-//            logger.debug("reply: {}", reply);
-//            long recvTime = System.currentTimeMillis();
-//            client.tpMonitor.incrementCount();;
-//            client.latMonitor.logLatency(sendTime, recvTime);
-        }
+        client.runBatch();
     }
 }

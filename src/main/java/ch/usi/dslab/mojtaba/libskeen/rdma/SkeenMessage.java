@@ -1,8 +1,6 @@
 package ch.usi.dslab.mojtaba.libskeen.rdma;
 
-import ch.usi.dslab.lel.ramcast.messages.RamcastMessage;
 import org.slf4j.LoggerFactory;
-
 import java.nio.ByteBuffer;
 
 public class SkeenMessage {
@@ -19,6 +17,7 @@ public class SkeenMessage {
     private int msgId;
     private int destinationSize;
     private int[] destinations;
+    private long sendTime;
 
     //STEP2 only
     private int nodeId;
@@ -55,6 +54,7 @@ public class SkeenMessage {
         this.msgId = msgId;
         this.destinationSize = destinationSize;
         this.destinations = destinations;
+        this.sendTime = sendTime;
         this.nodeId = nodeId;
         this.LC = LC;
 
@@ -70,6 +70,7 @@ public class SkeenMessage {
             destinations = new int[destinationSize];
         for (int i=0; i<destinationSize; i++)
             buffer.putInt(destinations[i]);
+        buffer.putLong(sendTime);
         buffer.putInt(nodeId);
         buffer.putInt(LC);
 
@@ -128,6 +129,10 @@ public class SkeenMessage {
 
     int[] getDestinations() {
         return destinations;
+    }
+
+    long getSendTime() {
+        return sendTime;
     }
 
     int getNodeId() {

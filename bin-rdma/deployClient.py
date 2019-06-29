@@ -16,20 +16,23 @@ def usage():
 if (len(sys.argv) not in [2]):
     usage()
 
-
+cmdList = []
 client_id = 1000
 client_host = '192.168.3.8'
 
 group_count = common.iarg(1)
 config_file = common.SYSTEM_CONFIG_DIR + "/" + str(group_count) + "g_system_config.json"
 
-cmdArgs = [common.JAVA_BIN, common.JAVA_CLASSPATH]
+cmdArgs = [common.JAVA_BIN, common.JAVA_CLASSPATH, '-DHOSTNAME=client_' + str(client_id)]
 cmdArgs += [common.LIBSKEEN_RDMA_CLASS_CLIENT, str(client_id), config_file]
-cmdArgs += [common.SENSE_HOST, common.SENSE_PORT, common.SENSE_DIRECTORY, common.SENSE_DURATION, common.SENSE_WARMUP]
-
+cmdArgs += [common.SENSE_ENABLED, common.SENSE_HOST, common.SENSE_PORT, common.SENSE_DIRECTORY, common.SENSE_DURATION, common.SENSE_WARMUP]
 cmdString = ' '.join([str(val) for val in cmdArgs])
-print cmdString
+# print cmdString
+cmdList.append({"node": client_host, "cmdstring": cmdString})
 
-common.sshcmd(client_host, cmdString)
+# common.sshcmd(client_host, cmdString)
+thread = common.LauncherThread(cmdList)
+thread.start()
+thread.join()
 
 
