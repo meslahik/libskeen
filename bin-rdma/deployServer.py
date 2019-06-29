@@ -26,13 +26,13 @@ for member in config["group_members"]:
 
     launchNodeCmdString = [common.JAVA_BIN, common.JAVA_CLASSPATH, '-DHOSTNAME=' + str(pid) + "-" + str(group)]
     launchNodeCmdString += [common.LIBSKEEN_RDMA_CLASS_SERVER, pid, config_file]
-    # launchNodeCmdString += ["true", common.NODES[1], common.SENSE_PORT, common.SENSE_DIRECTORY, common.SENSE_DURATION, common.SENSE_WARMUP]
+    launchNodeCmdString += [common.SENSE_ENABLED, common.SENSE_HOST, common.SENSE_PORT, common.SENSE_DIRECTORY, common.SENSE_DURATION, common.SENSE_WARMUP]
     launchNodeCmdString = " ".join([str(val) for val in launchNodeCmdString])
     cmdList.append({"node": host, "port": port, "cmdstring": launchNodeCmdString})
     # print launchNodeCmdString
 
 config_stream.close()
-print(cmdList)
+# print(cmdList)
 
 thread = common.LauncherThread(cmdList)
 thread.start()

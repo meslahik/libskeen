@@ -44,7 +44,7 @@ class LauncherThread(threading.Thread):
 
     def run(self):
         for cmd in self.cmdList:
-            logging.debug("Executing: %s", cmd["cmdstring"])
+            # logging.debug("Executing: %s", cmd["cmdstring"])
             sshcmdbg(cmd["node"], cmd["cmdstring"])
 
 
@@ -186,7 +186,7 @@ def noderange(first, last):
 def noderange2(first, last):
     return ["192.168.4." + str(val) for val in [node for node in range(first, last + 1) if node not in DEAD_NODES]]
 
-NODES = LOCALHOST_NODES if LOCALHOST else noderange(1, 8) + noderange(30,32)
+NODES = LOCALHOST_NODES if LOCALHOST else noderange(1, 9)
 NODES_RDMA = LOCALHOST_NODES if LOCALHOST else noderange2(1, 8)
 # NODES_CLIENTS = noderange(20, 40)
 
@@ -222,6 +222,10 @@ LIBSKEEN_HOME = os.path.normpath(GLOBAL_HOME + '/libskeen')
 LIBSKEEN_CP = os.path.normpath(LIBSKEEN_HOME + '/target/classes')
 LIBSKEEN_DEPENDENCIES = os.path.normpath(LIBSKEEN_HOME + '/target/dependency/*')
 
+DISNI_HOME = os.path.normpath(GLOBAL_HOME + '/disni')
+DISNI_CP = os.path.normpath(LIBSKEEN_HOME + '/target/classes')
+DISNI_DEPENDENCIES = os.path.normpath(LIBSKEEN_HOME + '/target/dependency/*')
+
 LIBRAMCAST_HOME = os.path.normpath(GLOBAL_HOME + '/libramcast')
 LIBRAMCAST_CP = os.path.normpath(LIBRAMCAST_HOME + '/target/classes')
 LIBRAMCAST_DEPENDENCIES = os.path.normpath(LIBRAMCAST_HOME + '/target/dependency/*')
@@ -231,7 +235,7 @@ SENSE_CP = os.path.normpath(SENSE_HOME + '/target/classes')
 SENSE_DEPENDENCIES = os.path.normpath(SENSE_HOME + '/target/dependency/*')
 
 SENSE_ENABLED = 'true'
-SENSE_HOST = '192.168.3.31'
+SENSE_HOST = '192.168.3.9'
 SENSE_PORT = 60000
 SENSE_DIRECTORY = '/home/eslahm/logs/libskeen-rdma-messaging/data'
 SENSE_DURATION = 60
@@ -240,7 +244,7 @@ SENSE_WARMUP = 10
 SYSTEM_CONFIG_DIR = os.path.normpath(script_dir() + '/systemConfigs')
 SYSTEM_CONFIG_FILE = SYSTEM_CONFIG_DIR + "/8g_system_config.json"
 
-_class_path = [LIBSKEEN_CP, LIBSKEEN_DEPENDENCIES, SENSE_CP, SENSE_DEPENDENCIES, LIBRAMCAST_CP, LIBRAMCAST_DEPENDENCIES]
+_class_path = [DISNI_CP, DISNI_DEPENDENCIES, LIBSKEEN_CP, LIBSKEEN_DEPENDENCIES, SENSE_CP, SENSE_DEPENDENCIES, LIBRAMCAST_CP, LIBRAMCAST_DEPENDENCIES]
 
 JAVA_BIN = 'java -Dlog4j.configuration=file:' + script_dir() + '/log4jDebug.xml'
 JAVA_CLASSPATH = '-cp \'' + ':'.join([str(val) for val in _class_path]) + "\'"

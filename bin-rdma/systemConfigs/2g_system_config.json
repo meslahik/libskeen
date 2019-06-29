@@ -3,7 +3,7 @@
         {
             "gpid": 0, 
             "group": 0, 
-            "rmcast_address": "192.168.3.1", 
+            "rmcast_address": "192.168.3.1",
             "host_rdma": "192.168.4.1", 
             "rmcast_port": 56000, 
             "pid": 0, 

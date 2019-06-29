@@ -1,34 +1,49 @@
 package ch.usi.dslab.mojtaba.libskeen.rdma;
 
+import ch.usi.dslab.lel.ramcast.RamcastConfig;
 import ch.usi.dslab.lel.ramcast.RamcastReceiver;
 
 import javafx.util.Pair;
 import org.slf4j.LoggerFactory;
 
+import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class Server extends Process {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(Server.class);
 
-    // TODO needs to be Atomic?
-    int LC = 0;
+    int LC = 0; //TODO: needs to be Atomic?
 
     RamcastReceiver agent;
     MessageProcessor messageProcessor;
-    public BlockingQueue<Pair<Integer, Integer>> atomicDeliver = new LinkedBlockingQueue<>();
+    BlockingQueue<Pair<Integer, Integer>> atomicDeliver = new LinkedBlockingQueue<>();
+
+    RamcastConfig config;
 
     public Server(int id, String configFile,
                   int poolsize, int recvQueue, int sendQueue, int wqSize, int servicetimeout,
-                  boolean polling, int maxinline) {
+                  boolean polling, int maxinline, int signalInterval,
+                  boolean isGathererEnabled, String gathererHost, int gathererPort, String fileDirectory, int experimentDuration, int warmUpTime) {
         super(id, true, configFile);
+
+        config = RamcastConfig.getInstance();
+        config.setRecvQueueSize(recvQueue);
+        config.setSendQueueSize(sendQueue);
+        config.setMaxinline(maxinline);
+        config.setServiceTimeout(servicetimeout);
+        config.setSignalInterval(signalInterval);
+        config.setWrQueueSize(wqSize);
+        config.setPolling(polling);
+        config.setPayloadSize(Message.size());
+
 
         System.out.println("running...server " + node.host + ", poolsize " + poolsize + ", maxinline " + maxinline +
                 ", polling " + polling + ", recvQueue " + recvQueue + ", sendQueue " + sendQueue + ", wqSize " + wqSize +
                 ", rpcservice-timeout " + servicetimeout);
-        messageProcessor = new MessageProcessor(this);
-        agent = new RamcastReceiver<Message>(node.host, node.port, sendQueue, recvQueue, maxinline, servicetimeout, polling, wqSize,
-                Message::new, messageProcessor);
+        messageProcessor = new MessageProcessor(this,
+                isGathererEnabled, gathererHost, gathererPort, fileDirectory, experimentDuration, warmUpTime);
+        agent = new RamcastReceiver(node.host, node.port, ByteBuffer.allocateDirect(10), messageProcessor, (x)->{}, (x)->{});
     }
 
     Pair<Integer, Integer> atomicDeliver() {
@@ -40,26 +55,33 @@ public class Server extends Process {
         return null;
     }
 
-//    @Override
-//    void uponDelivery(TCPMessage tcpMessage) {
-//
-//    }
-
     public static void main(String[] args) {
         int serverId = Integer.parseInt(args[0]);
         String configFile = args[1];
 
+        boolean isGathererEnabled = Boolean.parseBoolean(args[2]);
+        String gathererHost = args[3];
+        int gathererPort = Integer.parseInt(args[4]);
+        String fileDirectory = args[5];
+        int experimentDuration = Integer.parseInt(args[6]);
+        int warmUpTime = Integer.parseInt(args[7]);
+
         int poolsize = 1;
         int recvQueue = 100;
         int sendQueue = 100;
-        int wqSize = recvQueue;
-        int servicetimeout = 1;
-        boolean polling = false;
+        int wqSize = 1;
+        // all endpoints (the receiver and all senders) use this timeout =>
+        //  cmProcessor events timeout (receiver and senders); cqProcessor (receiver) event timeout when polling is false
+        int servicetimeout = 1; //millisecond
+        boolean polling = true; //receiver
         int maxinline = 0;
+        int signalInterval = 1;
 
 
         Server server = new Server(serverId, configFile,
-                poolsize, recvQueue, sendQueue, wqSize, servicetimeout, polling, maxinline);
-        server.startRunning(sendQueue, recvQueue, maxinline, servicetimeout);
+                poolsize, recvQueue, sendQueue, wqSize, servicetimeout, polling, maxinline, signalInterval,
+                isGathererEnabled, gathererHost, gathererPort, fileDirectory, experimentDuration, warmUpTime);
+        server.startRunning(sendQueue, recvQueue, maxinline);
+        System.out.println("server " + serverId + " started running");
     }
 }
