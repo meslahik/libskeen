@@ -29,29 +29,44 @@ public class ConsensusMsgProcessor implements ServerEventCallback {
     Map<Integer, ArrayList<Integer>> pendingMessages = new HashMap<>();
     TreeMap<Integer, SkeenMessage> pendingDeliverMessages = new TreeMap<>();
 
-    void send(ConsensusMessage message, int nodeId) {
-        replica.senders.get(nodeId).send(message.getBuffer(), false);
-    }
-
     // Acceptor
-    void processTWOAMessage(ConsensusMessage wrapperMessage) {
+    void processConsensusStep1Message(RamcastServerEvent event, ConsensusMessage wrapperMessage) {
         int msgInstanceNum = wrapperMessage.getInstanceId();
         SkeenMessage message = wrapperMessage.getSkeenMessage();
 
+        // reply is needed to be sent back to the server (leader) that sent this consensusMessage (server port)
+        SkeenMessage reply = new SkeenMessage(3, 0, 0);
+        event.setSendBuffer(reply.getBuffer());
+        try {
+            event.triggerResponse();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        logger.debug("ACK sent back for consensus step1 message");
+
         ConsensusMessage newWrapperMessage = new ConsensusMessage(2, msgInstanceNum, message, replica.pid);
-        for (Replica replica: Group.getGroup(replica.gid).replicaList)
-            send(newWrapperMessage, replica.pid);
+        replica.accept(newWrapperMessage);
     }
 
     // Learner
-    void processTWOBMessage(ConsensusMessage wrapperMessage) {
+    void processConsensusStep2Message(RamcastServerEvent event, ConsensusMessage wrapperMessage) {
         logger.debug("process message {}", wrapperMessage);
+
+        // reply is needed to be sent back to the replica that sent this consensusMessage (replica port)
+        ConsensusMessage reply = new ConsensusMessage(3);
+        event.setSendBuffer(reply.getBuffer());
+        try {
+            event.triggerResponse();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        logger.debug("ACK sent back for consensus step2 message");
+
         int msgInstanceNum = wrapperMessage.getInstanceId();
         if (lastDeliveredInstance >= msgInstanceNum) {
             logger.debug("ignore message {}", wrapperMessage);
             return;
         }
-
 
         SkeenMessage message = wrapperMessage.getSkeenMessage();
         int replicaId = wrapperMessage.getReplicaId();
@@ -91,14 +106,19 @@ public class ConsensusMsgProcessor implements ServerEventCallback {
         ConsensusMessage m = new ConsensusMessage();
         m.update(buffer);
 
+        logger.debug("received replica message {} ", m);
         int type = m.getMsgType();
         switch (type) {
             case 1:
-                processTWOAMessage(m);
+                processConsensusStep1Message(event, m);
                 break;
             case 2:
-                processTWOBMessage(m);
+                processConsensusStep2Message(event, m);
+                break;
+            case 3:
+                //ack message for consensus step2 message
+                logger.debug("ConsensusMessageProcessor: ACK received");
         }
-        event.setFree();
+//        event.setFree();
     }
 }

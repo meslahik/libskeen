@@ -66,6 +66,19 @@ public class MessageProcessor implements ServerEventCallback {
         }
     }
 
+    void deliverConsensus(SkeenMessage m) {
+        int type = m.getMsgType();
+        switch (type) {
+            case 1:
+                logger.debug("received STEP1 message {}", m);
+                processStep1Message(m);
+                break;
+            case 2:
+                logger.debug("received STEP2 message {}", m);
+                processMaxLCMessages(m);
+        }
+    }
+
     // TODO needs to be Atomic?
     int LC = 0;
 
@@ -105,7 +118,7 @@ public class MessageProcessor implements ServerEventCallback {
         Pending p = new Pending(clientId, messageId, nodeId, maxLC, destinationSize, destinations, skeenMessage);
 
         ordered.put(maxLC, p);
-        logger.debug("message {}-{}:{} is put in ordered queue to be delivered", maxLC, p.clientId, p.msgId);
+        logger.debug("replica {} message {}-{}:{} is put in ordered queue to be delivered", replica.pid, maxLC, p.clientId, p.msgId);
 
         while (ordered.size() > 0) {
             Map.Entry<Integer, Pending> minOrdered = ordered.firstEntry();
@@ -129,8 +142,8 @@ public class MessageProcessor implements ServerEventCallback {
             if (flag) {
                 ordered.pollFirstEntry();
                 Pair<Integer, Integer> deliverPair = new Pair<>(pending.clientId, pending.msgId);
-                server.atomicDeliver.add(deliverPair);
-                logger.debug("atomic decide message {}-{}:{}", minOrderedLC, pending.clientId, pending.msgId);
+                server.addDeliveredMessage(deliverPair);
+                logger.debug("replica {} atomic decide message {}-{}:{}", replica.pid, minOrderedLC, pending.clientId, pending.msgId);
 
                 if (isGathererEnabled) {
                     tpMonitor.incrementCount();
@@ -146,7 +159,7 @@ public class MessageProcessor implements ServerEventCallback {
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
-                    logger.debug("reply sent to the client");
+                    logger.debug("replica {} reply sent to the client", replica.pid);
                     waitingEvents.remove(deliverPair);
                 }
             } else {
@@ -165,15 +178,15 @@ public class MessageProcessor implements ServerEventCallback {
         int lc = skeenMessage.getLC();
         logger.debug("received STEP2 skeenMessage {} from {}", skeenMessage, nodeId);
 
-//        // reply is needed to be sent back to the server that sent this skeenMessage
-//        SkeenMessage reply = new SkeenMessage(3, clientId, messageId);
-//        event.setSendBuffer(reply.getBuffer());
-//        try {
-//            event.triggerResponse();
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-//        logger.debug("ACK skeenMessage sent back to the server {}", nodeId);
+        // reply is needed to be sent back to the server (the leader) that sent this skeenMessage
+        SkeenMessage reply = new SkeenMessage(3, clientId, messageId);
+        event.setSendBuffer(reply.getBuffer());
+        try {
+            event.triggerResponse();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        logger.debug("ACK skeenMessage sent back to the server {}", nodeId);
 
         Pending p = new Pending(clientId, messageId, nodeId, lc, destinationSize, destinations, skeenMessage);
         LC = Math.max(LC, p.LC);
@@ -228,27 +241,19 @@ public class MessageProcessor implements ServerEventCallback {
             for (int id : destinations)
                 destinationGroups.add(Group.getGroup(id));
             for (Group g : destinationGroups) {
-                server.send(newSkeenMessage, false, g.nodeList.get(0).pid);
-                logger.debug("sent skeenMessage {} to server {}", newSkeenMessage, g.nodeList.get(0));
+                Node gLeader = g.nodeList.get(0);
+                server.sendNonBlocking(newSkeenMessage, true, gLeader.pid);
+                logger.debug("sent skeenMessage {} to server {}", newSkeenMessage, gLeader);
+            }
+            for (Group g : destinationGroups) {
+                Node gLeader = g.nodeList.get(0);
+                server.deliverReply(gLeader.pid);
+                logger.debug("sent skeenMessage {} to server {}", newSkeenMessage, gLeader);
             }
         }
     }
 
-    void deliverConsensus(SkeenMessage m) {
-        int type = m.getMsgType();
-        switch (type) {
-            case 1:
-                logger.debug("received STEP1 message {}", m);
-                processStep1Message(m);
-                break;
-            case 2:
-                logger.debug("received STEP2 message {}", m);
-                processMaxLCMessages(m);
-        }
-        logger.debug("Step1 message processed");
-    }
-
-    // only leader processes receive these messages. clients send to leaders; leaders also send to leaders
+    // only leader processes receive these messages. clients sendConsensusStep2Message to leaders; leaders also sendConsensusStep2Message to leaders
     @Override
     public void call(RamcastServerEvent event) {
         ByteBuffer buffer = event.getReceiveBuffer();
@@ -269,10 +274,13 @@ public class MessageProcessor implements ServerEventCallback {
                 break;
             case 2:
                 processStep2Message(m, event);
+                break;
             case 3:
-                // ack message for receiving
+                // ack message
+                logger.debug("MessageProcessor: ACK received");
+
         }
-        event.setFree();
+//        event.setFree();
     }
 
 //    // threads for processing different message types

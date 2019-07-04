@@ -6,7 +6,7 @@ import java.nio.ByteBuffer;
 public class SkeenMessage {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(SkeenMessage.class);
 
-    private int SIZE = 24 + 32;
+    private int SIZE = 32 + 32;
 //    private int SIZE = 100;
 
     ByteBuffer buffer = ByteBuffer.allocateDirect(SIZE);
@@ -145,6 +145,6 @@ public class SkeenMessage {
 
     @Override
     public String toString() {
-        return "[SkeenMsg, msgType=" + msgType + " " + clientId + ":" + msgId + "]";
+        return "[SkeenMsg, msgType=" + msgType + ", " + clientId + ":" + msgId + "]";
     }
 }

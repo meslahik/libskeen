@@ -50,6 +50,10 @@ public class Server extends Process {
         replica.startRunning(poolsize, recvQueue, sendQueue, wqSize, servicetimeout, polling, maxinline, signalInterval);
     }
 
+    void addDeliveredMessage(Pair<Integer, Integer> deliverPair) {
+        atomicDeliver.add(deliverPair);
+    }
+
     Pair<Integer, Integer> atomicDeliver() {
         try {
             return atomicDeliver.take();

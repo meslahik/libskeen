@@ -1,14 +1,19 @@
 package ch.usi.dslab.mojtaba.libskeen.rdma;
 
+import ch.usi.dslab.lel.ramcast.RamcastFuture;
 import ch.usi.dslab.lel.ramcast.RamcastReceiver;
 import ch.usi.dslab.lel.ramcast.RamcastSender;
 import org.slf4j.LoggerFactory;
 
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.LinkedBlockingQueue;
 
-public class Replica {
+public class Replica implements Runnable {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(Replica.class);
 
     static HashMap<Integer, Replica> replicaMap;
@@ -48,6 +53,9 @@ public class Replica {
             e.printStackTrace();
         }
         createConnections(sendQueue, recvQueue, maxinline, servicetimeout);
+
+        Thread senderThread = new Thread(this, "SenderThread-" + pid);
+        senderThread.start();
     }
 
     public void createConnections(int sendQueue, int recvQueue, int maxinline, int clienttimeout) {
@@ -74,6 +82,10 @@ public class Replica {
         return port;
     }
 
+    public String toString() {
+        return Integer.toString(pid);
+    }
+
     // Learner
     public SkeenMessage decide() {
         try {
@@ -84,13 +96,47 @@ public class Replica {
         }
     }
 
+    Buffer send(ConsensusMessage msg, boolean expectReply, int nodeId) {
+        return senders.get(nodeId).send(msg.getBuffer(), expectReply);
+    }
+
+    RamcastFuture sendNonBlocking(ConsensusMessage msg, boolean expectReply, int nodeId) {
+        return senders.get(nodeId).sendNonBlocking(msg.getBuffer(), expectReply);
+    }
+
+    Buffer deliverReply(int nodeId) {
+        return senders.get(nodeId).deliverReply();
+    }
+
     // Proposer
     public void propose(SkeenMessage skeenMessage) {
         ConsensusMessage wrapperMessage = new ConsensusMessage(1, ++instanceNum, skeenMessage);
-        for (Replica replica: Group.getGroup(gid).replicaList) {
-            logger.debug("propose sent to replica {}, {}", replica.pid, wrapperMessage);
-            senders.get(replica.pid).send(wrapperMessage.getBuffer(), false);
-        }
+        sendingMessages.add(wrapperMessage);
     }
 
+    // Acceptor
+    public void accept(ConsensusMessage consensusMessage) {
+        sendingMessages.add(consensusMessage);
+    }
+
+    LinkedBlockingQueue<ConsensusMessage> sendingMessages = new LinkedBlockingQueue<>();
+
+    @Override
+    public void run() {
+        while (true) {
+            try {
+                ConsensusMessage consensusMessage = sendingMessages.take();
+                ArrayList<Replica> replicaList = Group.getGroup(gid).replicaList;
+                logger.debug("replica {} is sending to replicas {} message {}", pid, replicaList, consensusMessage);
+                for (Replica replica: replicaList)
+                    sendNonBlocking(consensusMessage, true, replica.pid);
+                logger.debug("replica {} is waiting for ACKs from replicas {}", pid, replicaList);
+                for (Replica replica: replicaList)
+                    deliverReply(replica.pid);
+                logger.debug("replica {} sending finished", pid);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 }

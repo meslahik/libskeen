@@ -6,13 +6,7 @@ import ch.usi.dslab.bezerra.sense.monitors.ThroughputPassiveMonitor;
 import ch.usi.dslab.lel.ramcast.RamcastConfig;
 import org.slf4j.LoggerFactory;
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.*;
 import java.util.concurrent.Semaphore;
 
 public class Client extends Process {
@@ -55,51 +49,49 @@ public class Client extends Process {
             tpMonitor = new ThroughputPassiveMonitor(node.pid, "client_overall", true);
             latMonitor = new LatencyPassiveMonitor(node.pid, "client_overall", true);
         }
+        setDestinations();
     }
 
     int[] destinations;
-    List<Group> destinationGroups;
+    int[] destinationGroups;
 
-    void setDestinations(int[] destinations) {
-        this.destinations = destinations;
-        destinationGroups = new ArrayList<>();
-        for (int id: destinations)
-            destinationGroups.add(Group.getGroup(id));
+    void setDestinations() {
+        int groupSize = Group.groupSize();
+        this.destinations = new int[groupSize];
+        this.destinationGroups = new int[groupSize];
+        int i = 0;
+        for (Group group: Group.groupList.values()) {
+            destinationGroups[i] = group.id;
+            destinations[i++] = group.nodeList.get(0).pid;
+        }
+        System.out.println("group size: " + groupSize);
+        System.out.println("group Leader IDs: " + Arrays.toString(destinations));
     }
 
     public void multicast() {
-        SkeenMessage skeenMessage = new SkeenMessage(1, node.pid, ++msgId, destinations.length, destinations);
+        SkeenMessage skeenMessage = new SkeenMessage(1, node.pid, ++msgId, destinations.length, destinationGroups);
 
-        for (Group g: destinationGroups) {
+        for (int i=0; i < destinations.length; i++) {
             logger.debug("sending message {}", skeenMessage);
-            sendNonBlocking(skeenMessage, true, g.nodeList.get(0).pid);
-//            ByteBuffer reply = (ByteBuffer) send(message, false, g.nodeList.get(0).pid);
+            sendNonBlocking(skeenMessage, true, destinations[i]);
+//            ByteBuffer reply = (ByteBuffer) sendConsensusStep2Message(message, false, g.nodeList.get(0).pid);
 //            int op = reply.getInt();
 //            int clientId = reply.getInt();
 //            int messageId = reply.getInt();
 //            logger.debug("reply: {}, {}, {}", op, clientId, messageId);
-            logger.debug("reply received");
+//            logger.debug("reply received");
         }
-        logger.debug("sent skeenMessage {} to its destinations {}", skeenMessage, destinations);
+        logger.debug("multicast {} to its destinations {}", skeenMessage, destinations);
+
+        for (int k = 0; k < destinations.length; k++)
+            deliverReply(destinations[k]);
+
     }
 
     void runBatch() {
-        int groupSize = Group.groupSize();
-        Set<Integer> groupIDs = Group.groupIDs();
-        int[] dests = new int[groupSize];
-        Iterator<Integer> it = groupIDs.iterator();
-        int j=0;
-        while (it.hasNext())
-            dests[j++] = it.next();
-        setDestinations(dests);
-        System.out.println("groupsize: " + groupSize);
-        System.out.println("groupIDs: " + groupIDs);
-
-        for (int i=0; i < 100000000; i++) {
+        for (int i = 0; i < 100000000; i++) {
             long sendTime = System.currentTimeMillis();
             multicast();
-            for (int k =0; k < dests.length; k++)
-                deliverReply(dests[k]);
             long recvTime = System.currentTimeMillis();
             if (isGathererEnabled) {
                 tpMonitor.incrementCount();
@@ -133,12 +125,11 @@ public class Client extends Process {
         int poolsize = 1;
         int recvQueue = 100;
         int sendQueue = 100;
-            int wqSize = 1;
-            int servicetimeout = 1; //millisecond
-            boolean polling = true; // not used for clients
-            int maxinline = 0;
-            int signalInterval = 1;
-
+        int wqSize = 1;
+        int servicetimeout = 1; //millisecond
+        boolean polling = true; // not used for clients
+        int maxinline = 0;
+        int signalInterval = 1;
 
 
         Client client = new Client(clientId, configFile, recvQueue, sendQueue, maxinline, servicetimeout,

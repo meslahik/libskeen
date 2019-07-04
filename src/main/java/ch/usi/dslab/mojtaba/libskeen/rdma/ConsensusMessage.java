@@ -1,15 +1,13 @@
 package ch.usi.dslab.mojtaba.libskeen.rdma;
 
-import ch.usi.dslab.lel.ramcast.messages.RamcastMessage;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 
 public class ConsensusMessage {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(ConsensusMessage.class);
 
-    static private int SIZE = 12 + 56;
+    static private int SIZE = 12 + 64;
 //    static private int SIZE = 100;
 
     ByteBuffer buffer = ByteBuffer.allocateDirect(SIZE);
@@ -26,6 +24,12 @@ public class ConsensusMessage {
 
     ConsensusMessage() {
 
+    }
+
+    ConsensusMessage(int msgType) {
+        this.msgType = msgType;
+
+        write(buffer);
     }
 
     ConsensusMessage(int msgType, int instanceId, SkeenMessage skeenMessage) {
