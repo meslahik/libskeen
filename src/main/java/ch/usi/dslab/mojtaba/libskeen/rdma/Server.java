@@ -7,25 +7,34 @@ import javafx.util.Pair;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 
 public class Server extends Process {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(Server.class);
 
-    Replica replica = Replica.replicaMap.get(node.pid);
+    Replica replica;
 
     RamcastConfig config;
 
     RamcastReceiver agent;
     MessageProcessor messageProcessor;
-    BlockingQueue<Pair<Integer, Integer>> atomicDeliver = new LinkedBlockingQueue<>();
+
+    class Deliver implements DeliverCallback {
+
+        @Override
+        public void call(Pair<Integer, Integer> deliverPair) {
+            // delivered ordered messages ...
+        }
+    }
+
+    Deliver onDeliver = new Deliver();
 
     public Server(int id, String configFile,
                   int poolsize, int recvQueue, int sendQueue, int wqSize, int servicetimeout,
                   boolean polling, int maxinline, int signalInterval,
                   boolean isGathererEnabled, String gathererHost, int gathererPort, String fileDirectory, int experimentDuration, int warmUpTime) {
         super(id, true, configFile);
+
+        Replica.replicaMap.get(node.pid).setOnDeliver(onDeliver);
 
         config = RamcastConfig.getInstance();
         config.setRecvQueueSize(recvQueue);
@@ -37,30 +46,20 @@ public class Server extends Process {
         config.setPolling(polling);
         config.setPayloadSize(ConsensusMessage.size());
 
-        messageProcessor = new MessageProcessor(this, replica,
-                isGathererEnabled, gathererHost, gathererPort, fileDirectory, experimentDuration, warmUpTime);
+        replica = Replica.replicaMap.get(node.pid);
+
+        messageProcessor = new MessageProcessor(replica);
         agent = new RamcastReceiver(node.host, node.port, ByteBuffer.allocateDirect(10), messageProcessor, (x) -> {}, (x)->{});
 
         System.out.println("running...server " + node.host + ", poolsize " + poolsize + ", maxinline " + maxinline +
                 ", polling " + polling + ", recvQueue " + recvQueue + ", sendQueue " + sendQueue + ", wqSize " + wqSize +
                 ", rpcservice-timeout " + servicetimeout);
         startRunning(sendQueue, recvQueue, maxinline);
+
 //        logger.debug("running replica ...");
-//        replica.startRunning(poolsize, recvQueue, sendQueue, wqSize, servicetimeout, polling, maxinline, signalInterval);
+        replica.setGatherer(isGathererEnabled, gathererHost, gathererPort, fileDirectory, experimentDuration, warmUpTime);
+        replica.setServer(this);
         replica.startRunning(poolsize, recvQueue, sendQueue, wqSize, servicetimeout, polling, maxinline, signalInterval);
-    }
-
-    void addDeliveredMessage(Pair<Integer, Integer> deliverPair) {
-        atomicDeliver.add(deliverPair);
-    }
-
-    Pair<Integer, Integer> atomicDeliver() {
-        try {
-            return atomicDeliver.take();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        return null;
     }
 
     public static void main(String[] args) {
@@ -84,7 +83,6 @@ public class Server extends Process {
         boolean polling = true; //receiver
         int maxinline = 0;
         int signalInterval = 1;
-
 
         Server server = new Server(serverId, configFile,
                 poolsize, recvQueue, sendQueue, wqSize, servicetimeout, polling, maxinline, signalInterval,

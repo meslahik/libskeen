@@ -2,14 +2,13 @@ package ch.usi.dslab.mojtaba.libskeen.rdma;
 
 import ch.usi.dslab.lel.ramcast.RamcastFuture;
 import ch.usi.dslab.lel.ramcast.RamcastSender;
-import javafx.util.Pair;
 import org.slf4j.LoggerFactory;
 
 import java.nio.Buffer;
-import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
 
 public abstract class Process {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(Process.class);
@@ -19,8 +18,6 @@ public abstract class Process {
     Map<Integer, RamcastSender> senders = new HashMap<>();
     boolean listenForConnections;
     boolean running;
-
-    LinkedBlockingQueue<Pair<Integer, ByteBuffer>> responses = new LinkedBlockingQueue<>();
 
     public Process(int id, boolean isServer, String configFile) {
         Configuration.loadConfig(configFile);
@@ -77,7 +74,21 @@ public abstract class Process {
         return senders.get(nodeId).sendNonBlocking(msg.getBuffer(), expectReply);
     }
 
-    Buffer deliverReply(int nodeId) {
-        return senders.get(nodeId).deliverReply();
+    Buffer deliverReply(int nodeId, RamcastFuture future) {
+        try {
+            return future.get();
+        } catch (ExecutionException | InterruptedException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    void deliverReply(Set<RamcastFuture> futureSet) {
+        try {
+            for (RamcastFuture future : futureSet)
+                future.get();
+        } catch (ExecutionException | InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 }

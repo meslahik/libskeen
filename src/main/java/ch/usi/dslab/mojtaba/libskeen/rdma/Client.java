@@ -4,28 +4,28 @@ import ch.usi.dslab.bezerra.sense.DataGatherer;
 import ch.usi.dslab.bezerra.sense.monitors.LatencyPassiveMonitor;
 import ch.usi.dslab.bezerra.sense.monitors.ThroughputPassiveMonitor;
 import ch.usi.dslab.lel.ramcast.RamcastConfig;
+import ch.usi.dslab.lel.ramcast.RamcastFuture;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.util.concurrent.Semaphore;
 
 public class Client extends Process {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(Client.class);
     ThroughputPassiveMonitor tpMonitor;
     LatencyPassiveMonitor latMonitor;
 
-    Semaphore sendPermits;
-
     int msgId = 0;
-    RamcastConfig config;
     boolean isGathererEnabled = false;
+
+    int[] destinations;
+    int[] destinationGroups;
 
     public Client(int id, String configFile,
                   int recvQueue, int sendQueue, int maxinline, int servicetimeout,
                   int signalInterval, int wqSize, boolean polling) {
         super(id, false, configFile);
 
-        config = RamcastConfig.getInstance();
+        RamcastConfig config = RamcastConfig.getInstance();
         config.setRecvQueueSize(recvQueue);
         config.setSendQueueSize(sendQueue);
         config.setMaxinline(maxinline);
@@ -52,9 +52,6 @@ public class Client extends Process {
         setDestinations();
     }
 
-    int[] destinations;
-    int[] destinationGroups;
-
     void setDestinations() {
         int groupSize = Group.groupSize();
         this.destinations = new int[groupSize];
@@ -70,21 +67,14 @@ public class Client extends Process {
 
     public void multicast() {
         SkeenMessage skeenMessage = new SkeenMessage(1, node.pid, ++msgId, destinations.length, destinationGroups);
-
-        for (int i=0; i < destinations.length; i++) {
+        Set<RamcastFuture> deliverFutures = new HashSet<>();
+        for (int i = 0; i < destinations.length; i++) {
             logger.debug("sending message {}", skeenMessage);
-            sendNonBlocking(skeenMessage, true, destinations[i]);
-//            ByteBuffer reply = (ByteBuffer) sendConsensusStep2Message(message, false, g.nodeList.get(0).pid);
-//            int op = reply.getInt();
-//            int clientId = reply.getInt();
-//            int messageId = reply.getInt();
-//            logger.debug("reply: {}, {}, {}", op, clientId, messageId);
-//            logger.debug("reply received");
+            RamcastFuture future = sendNonBlocking(skeenMessage, true, destinations[i]);
+            deliverFutures.add(future);
         }
         logger.debug("multicast {} to its destinations {}", skeenMessage, destinations);
-
-        for (int k = 0; k < destinations.length; k++)
-            deliverReply(destinations[k]);
+        deliverReply(deliverFutures);
 
     }
 
@@ -97,25 +87,7 @@ public class Client extends Process {
                 tpMonitor.incrementCount();
                 latMonitor.logLatency(sendTime, recvTime);
             }
-//            try {
-//                Thread.sleep(10);
-//            } catch (Exception e) {
-//                e.printStackTrace();
-//            }
         }
-    }
-
-    void getPermit() {
-        try {
-            sendPermits.acquire();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-            System.exit(1);
-        }
-    }
-
-    public void releasePermit() {
-        sendPermits.release();
     }
 
     public static void main(String[] args) {

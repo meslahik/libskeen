@@ -97,6 +97,6 @@ public class ConsensusMessage {
 
     @Override
     public String toString() {
-        return "[ConsensusMsg, instId=" + instanceId + "]";
+        return "[ConsensusMsg, type=" + msgType + ", instId=" + instanceId + "]";
     }
 }
