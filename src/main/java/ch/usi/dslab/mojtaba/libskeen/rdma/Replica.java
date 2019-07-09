@@ -148,20 +148,23 @@ public class Replica {
         return Integer.toString(pid);
     }
 
+    public void propose(SkeenMessage skeenMessage) {
+        sendConsensusStep1(skeenMessage);
+    }
 
     public void sendConsensusStep1(SkeenMessage skeenMessage) {
         ConsensusMessage consensusMessage = new ConsensusMessage(1, ++instanceNum, skeenMessage);
         ArrayList<Replica> replicaList = Group.getGroup(gid).replicaList;
 
-        // a fake message for the vote from this replica
-        ConsensusMessage fakeMessage = new ConsensusMessage(2, instanceNum, skeenMessage, pid);
-        processConsensusStep2Message(fakeMessage);
+//        // a fake message for the vote from this replica
+//        ConsensusMessage fakeMessage = new ConsensusMessage(2, instanceNum, skeenMessage, pid);
+//        processConsensusStep2Message(fakeMessage);
 
         logger.debug("replica {} is sending to replicas {} message {}", pid, replicaList, consensusMessage);
         Set<RamcastFuture> deliverFutures = new HashSet<>();
         for (Replica replica : replicaList) {
-            if (replica.pid == pid)
-                continue;
+//            if (replica.pid == pid)
+//                continue;
             RamcastFuture future = sendNonBlocking(consensusMessage, true, replica.pid);
             deliverFutures.add(future);
         }
@@ -188,7 +191,7 @@ public class Replica {
     }
 
     void processConsensusStep2Message(ConsensusMessage wrapperMessage) {
-        logger.debug("process message {}", wrapperMessage);
+        logger.debug("replica {} process message {}", wrapperMessage);
 
         int msgInstanceNum = wrapperMessage.getInstanceId();
         if (lastDeliveredInstance >= msgInstanceNum) {
@@ -295,8 +298,8 @@ public class Replica {
                 if (flag) {
                     ordered.pollFirstEntry();
                     Pair<Integer, Integer> deliverPair = new Pair<>(pending.clientId, pending.msgId);
-//                server.addDeliveredMessage(deliverPair);
-                    onDeliver.call(deliverPair);
+//                    server.addDeliveredMessage(deliverPair);
+//                    onDeliver.call(deliverPair);
                     logger.debug("replica {} atomic deliver message {}-{}:{}", pid, minOrderedLC, pending.clientId, pending.msgId);
 
                     if (isGathererEnabled) {

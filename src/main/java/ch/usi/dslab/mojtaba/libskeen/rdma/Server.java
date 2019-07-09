@@ -7,6 +7,8 @@ import javafx.util.Pair;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 public class Server extends Process {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(Server.class);
@@ -17,16 +19,17 @@ public class Server extends Process {
 
     RamcastReceiver agent;
     MessageProcessor messageProcessor;
+    BlockingQueue<Pair<Integer, Integer>> deliveredMessages = new LinkedBlockingQueue<>();
 
-    class Deliver implements DeliverCallback {
-
-        @Override
-        public void call(Pair<Integer, Integer> deliverPair) {
-            // delivered ordered messages ...
-        }
-    }
-
-    Deliver onDeliver = new Deliver();
+//    class Deliver implements DeliverCallback {
+//
+//        @Override
+//        public void call(Pair<Integer, Integer> deliverPair) {
+//            // delivered ordered messages ...
+//        }
+//    }
+//
+//    Deliver onDeliver = new Deliver();
 
     public Server(int id, String configFile,
                   int poolsize, int recvQueue, int sendQueue, int wqSize, int servicetimeout,
@@ -34,7 +37,7 @@ public class Server extends Process {
                   boolean isGathererEnabled, String gathererHost, int gathererPort, String fileDirectory, int experimentDuration, int warmUpTime) {
         super(id, true, configFile);
 
-        Replica.replicaMap.get(node.pid).setOnDeliver(onDeliver);
+//        Replica.replicaMap.get(node.pid).setOnDeliver(onDeliver);
 
         config = RamcastConfig.getInstance();
         config.setRecvQueueSize(recvQueue);
@@ -47,7 +50,6 @@ public class Server extends Process {
         config.setPayloadSize(ConsensusMessage.size());
 
         replica = Replica.replicaMap.get(node.pid);
-
         messageProcessor = new MessageProcessor(replica);
         agent = new RamcastReceiver(node.host, node.port, ByteBuffer.allocateDirect(10), messageProcessor, (x) -> {}, (x)->{});
 
@@ -62,6 +64,23 @@ public class Server extends Process {
         replica.startRunning(poolsize, recvQueue, sendQueue, wqSize, servicetimeout, polling, maxinline, signalInterval);
     }
 
+    void addDeliveredMessage(Pair<Integer, Integer> deliverPair) {
+        try {
+            deliveredMessages.put(deliverPair);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    Pair<Integer, Integer> deliver() {
+        try {
+            return deliveredMessages.take();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
     public static void main(String[] args) {
         int serverId = Integer.parseInt(args[0]);
         String configFile = args[1];
@@ -73,7 +92,7 @@ public class Server extends Process {
         int experimentDuration = Integer.parseInt(args[6]);
         int warmUpTime = Integer.parseInt(args[7]);
 
-        int poolsize = 1;
+        int poolsize = 1; //never used
         int recvQueue = 100;
         int sendQueue = 100;
         int wqSize = 1;
@@ -81,8 +100,8 @@ public class Server extends Process {
         //  cmProcessor events timeout (receiver and senders); cqProcessor (receiver) event timeout when polling is false
         int servicetimeout = 1; //millisecond
         boolean polling = true; //receiver
-        int maxinline = 0;
-        int signalInterval = 1;
+        int maxinline = 0; //byte
+        int signalInterval = 1; //RDMA write signaled interval
 
         Server server = new Server(serverId, configFile,
                 poolsize, recvQueue, sendQueue, wqSize, servicetimeout, polling, maxinline, signalInterval,

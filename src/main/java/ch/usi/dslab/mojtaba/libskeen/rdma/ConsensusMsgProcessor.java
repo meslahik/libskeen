@@ -29,12 +29,7 @@ public class ConsensusMsgProcessor implements ServerEventCallback {
             e.printStackTrace();
         }
         logger.debug("replica {} reply sent back for consensus step1 message", replica.pid);
-
-//        ConsensusMessage newWrapperMessage = new ConsensusMessage(2, msgInstanceNum, message, replica.pid);
-//        replica.accept(newWrapperMessage);
     }
-
-
 
     void processConsensusStep3Message(RamcastServerEvent event, ConsensusMessage message) {
         ConsensusMessage reply = new ConsensusMessage(4);

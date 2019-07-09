@@ -94,14 +94,16 @@ public class Client extends Process {
         int clientId = Integer.parseInt(args[0]);
         String configFile = args[1];
 
-        int poolsize = 1;
+        int poolsize = 1; //never used
         int recvQueue = 100;
         int sendQueue = 100;
         int wqSize = 1;
+        // all endpoints (the receiver and all senders) use this timeout =>
+        //  cmProcessor events timeout (receiver and senders); cqProcessor (receiver) event timeout when polling is false
         int servicetimeout = 1; //millisecond
-        boolean polling = true; // not used for clients
-        int maxinline = 0;
-        int signalInterval = 1;
+        boolean polling = true; // not used for clients; there is no receiver
+        int maxinline = 0; //byte
+        int signalInterval = 1; //RDMA write signaled interval
 
 
         Client client = new Client(clientId, configFile, recvQueue, sendQueue, maxinline, servicetimeout,

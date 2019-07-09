@@ -50,15 +50,13 @@ public class MessageProcessor implements ServerEventCallback {
 //        consensusDeliverer.start();
     }
 
-
-    private synchronized void processStep2Message(SkeenMessage skeenMessage, RamcastServerEvent event) {
+    void processStep2Message(SkeenMessage skeenMessage, RamcastServerEvent event) {
         int clientId = skeenMessage.getClientId();
         int messageId = skeenMessage.getMsgId();
         int destinationSize = skeenMessage.getDestinationSize();
         int[] destinations = skeenMessage.getDestinations();
         int nodeId = skeenMessage.getNodeId();
         int lc = skeenMessage.getLC();
-        logger.debug("received Skeen STEP2 message {} from {}", skeenMessage, nodeId);
 
         // reply is needed to be sent back to the server (the leader) that sent this skeenMessage
         SkeenMessage reply = new SkeenMessage(3, clientId, messageId);
@@ -70,6 +68,9 @@ public class MessageProcessor implements ServerEventCallback {
         }
         logger.debug("ACK skeenMessage sent back to the server {}", nodeId);
 
+
+
+        logger.debug("replica {} received Skeen STEP2 message {} from {}", replica.pid, skeenMessage, nodeId);
         Pending p = new Pending(clientId, messageId, nodeId, lc, destinationSize, destinations, skeenMessage);
         replica.LC = Math.max(replica.LC, p.LC);
         Pair<Integer, Integer> pair = new Pair<>(p.clientId, p.msgId);
@@ -103,11 +104,11 @@ public class MessageProcessor implements ServerEventCallback {
 
         SkeenMessage newSkeenMessage = new SkeenMessage(2, clientId, messageId, destinationSize, destinations,
                 replica.pid, maxLC);
-        replica.sendConsensusStep1(newSkeenMessage);
+        replica.propose(newSkeenMessage);
     }
 
     void processStep1Message(SkeenMessage m, RamcastServerEvent event) {
-        logger.debug("received STEP1 message {}", m);
+        logger.debug("replica {} received Skeen STEP1 message {}", replica.pid, m);
         int clientId = m.getClientId();
         int messageId = m.getMsgId();
 
@@ -121,11 +122,10 @@ public class MessageProcessor implements ServerEventCallback {
 
         Pair<Integer, Integer> pair = new Pair<>(clientId, messageId);
         replica.waitingEvents.put(pair, event);
-
-        replica.sendConsensusStep1(m);
+        replica.propose(m);
     }
 
-    // only leader processes receive these messages. clients sendConsensusStep2Message to leaders; leaders also sendConsensusStep2Message to leaders
+    // only leader processes receive these messages. clients skeen Step1 messages to leaders; leaders also skeen Step2 message to leaders
     @Override
     public void call(RamcastServerEvent event) {
         ByteBuffer buffer = event.getReceiveBuffer();
@@ -140,7 +140,6 @@ public class MessageProcessor implements ServerEventCallback {
             case 2:
                 processStep2Message(m, event);
                 break;
-
         }
     }
 
