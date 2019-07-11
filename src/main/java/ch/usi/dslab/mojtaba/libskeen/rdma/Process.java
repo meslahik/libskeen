@@ -38,8 +38,10 @@ public abstract class Process {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        if (!listenForConnections || node.isLeader)
+        if (!listenForConnections)
             createConnections(sendQueue, recvQueue, maxinline);
+        else if (node.isLeader)
+            createConnections (sendQueue, recvQueue, maxinline);
     }
 
     public void createConnections(int sendQueue, int recvQueue, int maxinline) {
@@ -60,11 +62,35 @@ public abstract class Process {
 //        logger.debug("creating sender for host {}", node.host);
         RamcastSender sender =
                 new RamcastSender(node.host, node.port, sendQueue,recvQueue, maxinline);
-        logger.debug("sender created for {}", node.host);
+        logger.debug("sender created for node {}, port {}", node.host, node.port);
 
         senders.put(node.pid, sender);
         return true;
     }
+
+//    public void createConnections2(int sendQueue, int recvQueue, int maxinline) {
+//        // once done loading the processes, start a thread here that will keep trying to connect to each
+//        // learner/coordinator. exceptions are likely to be thrown, as processes start at different times, but keep
+//        // trying, until the client is connected to all coordinators (TODO: to all learners, in case of fast opt).
+//
+//        // this is sub-optimal though. ideally, a central coordinator (e.g., ZooKeeper, ZooFence, Volery...)
+//        // would be used. but that would be an over-optimization, done only if this library is ever published.
+//
+//        for (Group group: Group.groupList.values()) {
+//            connect2(group.nodeList.get(0), sendQueue, recvQueue, maxinline);
+//        }
+//        System.out.println("Process " + node.pid + ": All senders created!");
+//    }
+//
+//    public boolean connect2(Node node, int sendQueue, int recvQueue, int maxinline) {
+////        logger.debug("creating sender for host {}", node.host);
+//        RamcastSender sender =
+//                new RamcastSender(node.host, node.port+100, sendQueue,recvQueue, maxinline);
+//        logger.debug("sender created for node {}, port {}", node.host, node.port+100);
+//
+//        senders.put(node.pid, sender);
+//        return true;
+//    }
 
     Buffer send(SkeenMessage msg, boolean expectReply, int nodeId) {
         return senders.get(nodeId).send(msg.getBuffer(), expectReply);

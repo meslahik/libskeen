@@ -17,21 +17,21 @@
     {
       "pid": 1,
       "group": 0,
-      "host": "192.168.3.1",
-      "host_rdma": "192.168.4.1",
+      "host": "192.168.3.2",
+      "host_rdma": "192.168.4.2",
       "port": 50001,
       "replica_port": 51001,
-      "rmcast_address": "192.168.3.1",
+      "rmcast_address": "192.168.3.2",
       "rmcast_port": 56001
     },
     {
       "pid": 2,
       "group": 0,
-      "host": "192.168.3.1",
-      "host_rdma": "192.168.4.1",
+      "host": "192.168.3.3",
+      "host_rdma": "192.168.4.3",
       "port": 50002,
       "replica_port": 51002,
-      "rmcast_address": "192.168.3.1",
+      "rmcast_address": "192.168.3.3",
       "rmcast_port": 56002
     },
     {
@@ -47,21 +47,21 @@
     {
       "pid": 4,
       "group": 1,
-      "host": "192.168.3.2",
-      "host_rdma": "192.168.4.2",
+      "host": "192.168.3.3",
+      "host_rdma": "192.168.4.3",
       "port": 50004,
       "replica_port": 51004,
-      "rmcast_address": "192.168.3.2",
+      "rmcast_address": "192.168.3.3",
       "rmcast_port": 56004
     },
     {
       "pid": 5,
       "group": 1,
-      "host": "192.168.3.2",
-      "host_rdma": "192.168.4.2",
+      "host": "192.168.3.4",
+      "host_rdma": "192.168.4.4",
       "port": 50005,
       "replica_port": 51005,
-      "rmcast_address": "192.168.3.2",
+      "rmcast_address": "192.168.3.4",
       "rmcast_port": 56005
     },
     {
@@ -77,21 +77,21 @@
     {
       "pid": 7,
       "group": 2,
-      "host": "192.168.3.3",
-      "host_rdma": "192.168.4.3",
+      "host": "192.168.3.4",
+      "host_rdma": "192.168.4.4",
       "port": 50007,
       "replica_port": 51007,
-      "rmcast_address": "192.168.3.3",
+      "rmcast_address": "192.168.3.4",
       "rmcast_port": 56007
     },
     {
       "pid": 8,
       "group": 2,
-      "host": "192.168.3.3",
-      "host_rdma": "192.168.4.3",
+      "host": "192.168.3.5",
+      "host_rdma": "192.168.4.5",
       "port": 50008,
       "replica_port": 51008,
-      "rmcast_address": "192.168.3.3",
+      "rmcast_address": "192.168.3.5",
       "rmcast_port": 56008
     },
     {
@@ -107,21 +107,21 @@
     {
       "pid": 10,
       "group": 3,
-      "host": "192.168.3.4",
-      "host_rdma": "192.168.4.4",
+      "host": "192.168.3.5",
+      "host_rdma": "192.168.4.5",
       "port": 50010,
       "replica_port": 51010,
-      "rmcast_address": "192.168.3.4",
+      "rmcast_address": "192.168.3.5",
       "rmcast_port": 56010
     },
     {
       "pid": 11,
       "group": 3,
-      "host": "192.168.3.4",
-      "host_rdma": "192.168.4.4",
+      "host": "192.168.3.6",
+      "host_rdma": "192.168.4.6",
       "port": 50011,
       "replica_port": 51011,
-      "rmcast_address": "192.168.3.4",
+      "rmcast_address": "192.168.3.6",
       "rmcast_port": 56011
     }
   ]

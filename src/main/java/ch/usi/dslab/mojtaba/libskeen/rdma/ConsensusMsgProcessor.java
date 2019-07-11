@@ -11,16 +11,16 @@ public class ConsensusMsgProcessor implements ServerEventCallback {
 
     Replica replica;
 
+    // process consensus step1 message
     ConsensusMsgProcessor(Replica replica) {
         this.replica = replica;
     }
 
-    void processConsensusStep1Message(RamcastServerEvent event, ConsensusMessage wrapperMessage) {
-        int msgInstanceNum = wrapperMessage.getInstanceId();
-        SkeenMessage message = wrapperMessage.getSkeenMessage();
+    void processConsensusStep1Messaege(RamcastServerEvent event, ConsensusMessage consensusMessage) {
+        int msgInstanceNum = consensusMessage.getInstanceId();
+        SkeenMessage message = consensusMessage.getSkeenMessage();
 
-        // reply is needed to be sent back to the server (leader) that sent this consensusMessage (server port)
-//        SkeenMessage reply = new SkeenMessage(3, 0, 0);
+        // reply is needed to be sent back to the coordinator
         ConsensusMessage reply = new ConsensusMessage(2, msgInstanceNum, message, replica.pid);
         event.setSendBuffer(reply.getBuffer());
         try {
@@ -31,7 +31,8 @@ public class ConsensusMsgProcessor implements ServerEventCallback {
         logger.debug("replica {} reply sent back for consensus step1 message", replica.pid);
     }
 
-    void processConsensusStep3Message(RamcastServerEvent event, ConsensusMessage message) {
+    void processConsensusStep3Message(RamcastServerEvent event, ConsensusMessage consensusMessage) {
+        // reply is needed to be sent back to the coordinator
         ConsensusMessage reply = new ConsensusMessage(4);
         event.setSendBuffer(reply.getBuffer());
         try {
@@ -40,8 +41,8 @@ public class ConsensusMsgProcessor implements ServerEventCallback {
             e.printStackTrace();
         }
 
-        int lastDeliveredInstance = message.getInstanceId();
-        SkeenMessage deliverMessage = message.getSkeenMessage();
+        int lastDeliveredInstance = consensusMessage.getInstanceId();
+        SkeenMessage deliverMessage = consensusMessage.getSkeenMessage();
 
         logger.debug("replica {} decide message {} lastDeliverdInstance {}", replica.pid, deliverMessage, lastDeliveredInstance);
         try {
@@ -55,21 +56,19 @@ public class ConsensusMsgProcessor implements ServerEventCallback {
     @Override
     public void call(RamcastServerEvent event) {
         ByteBuffer buffer = event.getReceiveBuffer();
-        ConsensusMessage m = new ConsensusMessage();
-        m.update(buffer);
+        ConsensusMessage consensusMessage = new ConsensusMessage();
+        consensusMessage.update(buffer);
 
-        int type = m.getMsgType();
-        switch (type) {
-            case 1:
-                logger.debug("replica {} received consensus step1 message {} ", replica.pid, m);
-                processConsensusStep1Message(event, m);
-                break;
-//            case 2:
-//                processConsensusStep2Message(m);
+        processConsensusStep1Messaege(event, consensusMessage);
+
+//        int type = consensusMessage.getMsgType();
+//        switch (type) {
+//            case 1:
+//                processConsensusStep1Messaege(event, consensusMessage);
 //                break;
-            case 3:
-                processConsensusStep3Message(event, m);
-                break;
-        }
+//            case 3:
+//                processConsensusStep3Message(event, consensusMessage);
+//                break;
+//        }
     }
 }

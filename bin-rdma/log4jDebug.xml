@@ -43,11 +43,15 @@
         <level value="error"/>
         <appender-ref ref="console"/>
     </logger>
-    <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.MessageProcessor" additivity="false">
+    <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.SkeenMessageProcessor1" additivity="false">
         <level value="error"/>
         <appender-ref ref="console"/>
     </logger>
     <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.ConsensusMsgProcessor" additivity="false">
+        <level value="error"/>
+        <appender-ref ref="console"/>
+    </logger>
+    <logger name="ch.usi.dslab.mojtaba.libskeen.rdma.ConsensusMsgProcessor2" additivity="false">
         <level value="error"/>
         <appender-ref ref="console"/>
     </logger>

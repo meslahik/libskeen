@@ -14,6 +14,7 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Replica {
     private static final org.slf4j.Logger logger = LoggerFactory.getLogger(Replica.class);
@@ -33,21 +34,23 @@ public class Replica {
     String host;
     int port;
 
-    int instanceNum = 0;
-    int LC = 0; // TODO: needs to be Atomic?
-    int lastDeliveredInstance = 0;
+    AtomicInteger instanceNum;
+    AtomicInteger LC; // TODO: needs to be Atomic?
+    AtomicInteger lastDeliveredInstance;
 
     Server server;
-    RamcastReceiver agent;
+//    RamcastReceiver agent;
     Map<Integer, RamcastSender> senders = new HashMap<>();
+    Map<Integer, RamcastSender> senders2 = new HashMap<>();
 
     Decide decideCallback = new Decide();
     DeliverCallback onDeliver;
     ConsensusMsgProcessor consensusMsgProcessor;
+    ConsensusMsgProcessor2 consensusMsgProcessor2;
 
     Map<Pair<Integer, Integer>, ArrayList<Pending>> pendingMsgs = new ConcurrentHashMap<>();
-    Map<Integer, ArrayList<Integer>> pendingMessages = new HashMap<>();
-    TreeMap<Integer, SkeenMessage> pendingDeliverMessages = new TreeMap<>();
+    Map<Integer, ArrayList<Integer>> pendingMessages = new ConcurrentHashMap<>();
+    ConcurrentSkipListMap<Integer, SkeenMessage> pendingMajorityMessages = new ConcurrentSkipListMap<>();
     Map<Pair<Integer, Integer>, RamcastServerEvent> waitingEvents = new ConcurrentHashMap<>();
 
 //    Executor executor = Executors.newSingleThreadExecutor();
@@ -60,7 +63,11 @@ public class Replica {
         this.gid = gid;
         replicaMap.put(pid, this);
         consensusMsgProcessor = new ConsensusMsgProcessor(this);
+        consensusMsgProcessor2 = new ConsensusMsgProcessor2(this);
 
+        LC = new AtomicInteger(0);
+        instanceNum = new AtomicInteger(0);
+        lastDeliveredInstance = new AtomicInteger(0);
     }
 
     void setGatherer(boolean isGathererEnabled, String gathererHost, int gathererPort, String fileDirectory, int experimentDuration, int warmUpTime) {
@@ -74,7 +81,8 @@ public class Replica {
 
     void startRunning(int poolsize, int recvQueue, int sendQueue, int wqSize, int servicetimeout,
                       boolean polling, int maxinline, int signalInterval) {
-        agent = new RamcastReceiver(host, port, ByteBuffer.allocateDirect(10), consensusMsgProcessor, (x) -> {}, (x)->{});
+        new RamcastReceiver(host, port, ByteBuffer.allocateDirect(10), consensusMsgProcessor, (x) -> {}, (x)->{});
+        new RamcastReceiver(host, port+100, ByteBuffer.allocateDirect(10), consensusMsgProcessor2, (x) -> {}, (x)->{});
         try {
             Thread.sleep(3000);
         } catch (Exception e) {
@@ -96,9 +104,12 @@ public class Replica {
     public boolean connect(Replica replica, int sendQueue, int recvQueue, int maxinline, int clienttimeout) {
         RamcastSender sender =
                 new RamcastSender(replica.host, replica.port, sendQueue,recvQueue, maxinline);
-        logger.debug("sender created for {}, {}", replica.host, replica.port);
+        RamcastSender sender2 =
+                new RamcastSender(replica.host, replica.port+100, sendQueue,recvQueue, maxinline);
+        logger.debug("senders created for {}, port {} and {}", replica.host, replica.port, replica.port+100);
 
         senders.put(replica.pid, sender);
+        senders2.put(replica.pid, sender2);
         return true;
     }
 
@@ -108,6 +119,10 @@ public class Replica {
 
     RamcastFuture sendNonBlocking(ConsensusMessage msg, boolean expectReply, int nodeId) {
         return senders.get(nodeId).sendNonBlocking(msg.getBuffer(), expectReply);
+    }
+
+    RamcastFuture sendNonBlocking2(ConsensusMessage msg, boolean expectReply, int nodeId) {
+        return senders2.get(nodeId).sendNonBlocking(msg.getBuffer(), expectReply);
     }
 
     ByteBuffer deliverReply(RamcastFuture future) {
@@ -136,9 +151,9 @@ public class Replica {
         return port;
     }
 
-    void setOnDeliver(DeliverCallback onDeliver) {
-        this.onDeliver = onDeliver;
-    }
+//    void setOnDeliver(DeliverCallback onDeliver) {
+//        this.onDeliver = onDeliver;
+//    }
 
     void setServer(Server server) {
         this.server = server;
@@ -153,7 +168,7 @@ public class Replica {
     }
 
     public void sendConsensusStep1(SkeenMessage skeenMessage) {
-        ConsensusMessage consensusMessage = new ConsensusMessage(1, ++instanceNum, skeenMessage);
+        ConsensusMessage consensusMessage = new ConsensusMessage(1, instanceNum.incrementAndGet(), skeenMessage);
         ArrayList<Replica> replicaList = Group.getGroup(gid).replicaList;
 
 //        // a fake message for the vote from this replica
@@ -182,19 +197,19 @@ public class Replica {
         logger.debug("replica {} is sending to replicas {} MESSAGE {}", pid, replicaList, consensusMessage);
         Set<RamcastFuture> deliverFutures = new HashSet<>();
         for (Replica replica : replicaList) {
-            RamcastFuture future = sendNonBlocking(consensusMessage, true, replica.pid);
+            RamcastFuture future = sendNonBlocking2(consensusMessage, true, replica.pid);
             deliverFutures.add(future);
         }
         logger.debug("replica {} is waiting for ACKs from replicas {}", pid, replicaList);
-        deliverReply(deliverFutures);
+
         logger.debug("replica {} sending finished", pid);
     }
 
     void processConsensusStep2Message(ConsensusMessage wrapperMessage) {
-        logger.debug("replica {} process message {}", wrapperMessage);
+        logger.debug("replica {} process message {}", pid, wrapperMessage);
 
-        int msgInstanceNum = wrapperMessage.getInstanceId();
-        if (lastDeliveredInstance >= msgInstanceNum) {
+        int consensusInstanceNum = wrapperMessage.getInstanceId();
+        if (lastDeliveredInstance.get() >= consensusInstanceNum) {
             logger.debug("ignore message {}", wrapperMessage);
             return;
         }
@@ -202,31 +217,32 @@ public class Replica {
         SkeenMessage message = wrapperMessage.getSkeenMessage();
         int replicaId = wrapperMessage.getReplicaId();
 
-        if (pendingMessages.containsKey(msgInstanceNum))
-            pendingMessages.get(msgInstanceNum).add(replicaId);
+        if (pendingMessages.containsKey(consensusInstanceNum))
+            pendingMessages.get(consensusInstanceNum).add(replicaId);
         else {
             ArrayList<Integer> array = new ArrayList<>();
             array.add(replicaId);
-            pendingMessages.put(msgInstanceNum, array);
+            pendingMessages.put(consensusInstanceNum, array);
         }
 
-        ArrayList<Integer> arrayList = pendingMessages.get(msgInstanceNum);
-        logger.debug("put into pending messages for decision delivery. received {} votes for decision instance {}.",
-                arrayList.size(), msgInstanceNum);
+        ArrayList<Integer> arrayList = pendingMessages.get(consensusInstanceNum);
+        logger.debug("put {} from replica {} into pending messages. received {} votes for consensus instance {}",
+                wrapperMessage, replicaId, arrayList.size(), consensusInstanceNum);
 
         if (arrayList.size() > Group.getGroup(gid).replicaList.size() / 2) {
-            pendingDeliverMessages.put(msgInstanceNum, message);
+            logger.debug("received majority votes for consensus instance {} message {}. put into pending majority messages", consensusInstanceNum, message);
+            pendingMajorityMessages.put(consensusInstanceNum, message);
         }
 
-        while(pendingDeliverMessages.size() != 0) {
-            if (pendingDeliverMessages.firstEntry().getKey() == lastDeliveredInstance + 1) {
-                Map.Entry<Integer, SkeenMessage> entry = pendingDeliverMessages.pollFirstEntry();
+        while(pendingMajorityMessages.size() != 0) {
+            if (pendingMajorityMessages.firstEntry().getKey() == lastDeliveredInstance.get() + 1) {
+                Map.Entry<Integer, SkeenMessage> entry = pendingMajorityMessages.pollFirstEntry();
                 SkeenMessage deliverMessage = entry.getValue();
                 pendingMessages.remove(entry.getKey());
-                lastDeliveredInstance++;
+                lastDeliveredInstance.incrementAndGet();
 
                 // send message to other replicas
-                ConsensusMessage learnMessage = new ConsensusMessage(3, lastDeliveredInstance, deliverMessage);
+                ConsensusMessage learnMessage = new ConsensusMessage(3, lastDeliveredInstance.get(), deliverMessage);
                 sendConsensusStep3(learnMessage);
 //                sendConsensusStep3Message = new ConsensusMessage(3, lastDeliveredInstance, deliverMessage);
 //                executor.execute(this);
@@ -243,11 +259,11 @@ public class Replica {
             int destinationSize = skeenMessage.getDestinationSize();
             int[] destinations = skeenMessage.getDestinations();
 
-            LC++;
+            LC.incrementAndGet();
 
             if (server.node.isLeader) {
                 SkeenMessage newSkeenMessage = new SkeenMessage(2, clientId, messageId, destinationSize, destinations,
-                        server.node.pid, LC);
+                        server.node.pid, LC.get());
 
                 List<Group> destinationGroups = new ArrayList<>();
                 for (int id : destinations)
@@ -280,6 +296,7 @@ public class Replica {
                 Map.Entry<Integer, Pending> minOrdered = ordered.firstEntry();
                 Integer minOrderedLC = minOrdered.getKey();
                 Pending pending = minOrdered.getValue();
+                logger.debug("replica {}, pending to deliver: {}", pid, pending);
 
                 boolean flag = true;
                 Collection<ArrayList<Pending>> arrs = pendingMsgs.values();
@@ -309,6 +326,7 @@ public class Replica {
 
                     SkeenMessage reply = new SkeenMessage(3, pending.clientId, pending.msgId);
                     RamcastServerEvent event = waitingEvents.get(deliverPair);
+                    logger.debug("replica {} event: {}, waitingEvents size: {}, pair (key): {}", pid, event, waitingEvents.keySet(), deliverPair);
                     if (event != null) {
                         event.setSendBuffer(reply.getBuffer());
                         try {
