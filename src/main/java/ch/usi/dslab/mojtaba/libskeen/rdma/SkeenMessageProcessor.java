@@ -8,12 +8,12 @@ import org.slf4j.LoggerFactory;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
-public class SkeenMessageProcessor1 implements ServerEventCallback {
-    private static final org.slf4j.Logger logger = LoggerFactory.getLogger(SkeenMessageProcessor1.class);
+public class SkeenMessageProcessor implements ServerEventCallback {
+    private static final org.slf4j.Logger logger = LoggerFactory.getLogger(SkeenMessageProcessor.class);
 
     Replica replica;
 
-    SkeenMessageProcessor1(Replica replica) {
+    SkeenMessageProcessor(Replica replica) {
         this.replica = replica;
     }
 

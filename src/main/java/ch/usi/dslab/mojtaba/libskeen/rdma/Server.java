@@ -17,10 +17,7 @@ public class Server extends Process {
 
     RamcastConfig config;
 
-//    RamcastReceiver agent;
-//    RamcastReceiver agent2;
-    SkeenMessageProcessor1 skeenMessageProcessor1;
-    SkeenMessageProcessor2 skeenMessageProcessor2;
+    SkeenMessageProcessor skeenMessageProcessor;
     BlockingQueue<Pair<Integer, Integer>> deliveredMessages = new LinkedBlockingQueue<>();
 
 //    class Deliver implements DeliverCallback {
@@ -51,10 +48,8 @@ public class Server extends Process {
 
         replica = Replica.replicaMap.get(node.pid);
 //        replica.setOnDeliver();
-        skeenMessageProcessor1 = new SkeenMessageProcessor1(replica);
-//        skeenMessageProcessor2 = new SkeenMessageProcessor2(replica);
-        new RamcastReceiver(node.host, node.port, ByteBuffer.allocateDirect(10), skeenMessageProcessor1, (x) -> {}, (x)->{});
-//        new RamcastReceiver(node.host, node.port+100, ByteBuffer.allocateDirect(10), skeenMessageProcessor2, (x) -> {}, (x)->{});
+        skeenMessageProcessor = new SkeenMessageProcessor(replica);
+        new RamcastReceiver(node.host, node.port, ByteBuffer.allocateDirect(10), skeenMessageProcessor, (x) -> {}, (x)->{});
 
         System.out.println("running...server " + node.host + ", poolsize " + poolsize + ", maxinline " + maxinline +
                 ", polling " + polling + ", recvQueue " + recvQueue + ", sendQueue " + sendQueue + ", wqSize " + wqSize +

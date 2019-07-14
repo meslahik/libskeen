@@ -59,16 +59,14 @@ public class ConsensusMsgProcessor implements ServerEventCallback {
         ConsensusMessage consensusMessage = new ConsensusMessage();
         consensusMessage.update(buffer);
 
-        processConsensusStep1Messaege(event, consensusMessage);
-
-//        int type = consensusMessage.getMsgType();
-//        switch (type) {
-//            case 1:
-//                processConsensusStep1Messaege(event, consensusMessage);
-//                break;
-//            case 3:
-//                processConsensusStep3Message(event, consensusMessage);
-//                break;
-//        }
+        int type = consensusMessage.getMsgType();
+        switch (type) {
+            case 1:
+                processConsensusStep1Messaege(event, consensusMessage);
+                break;
+            case 3:
+                processConsensusStep3Message(event, consensusMessage);
+                break;
+        }
     }
 }

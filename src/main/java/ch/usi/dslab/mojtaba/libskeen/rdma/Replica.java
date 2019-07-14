@@ -39,14 +39,11 @@ public class Replica {
     AtomicInteger lastDeliveredInstance;
 
     Server server;
-//    RamcastReceiver agent;
     Map<Integer, RamcastSender> senders = new HashMap<>();
-    Map<Integer, RamcastSender> senders2 = new HashMap<>();
 
     Decide decideCallback = new Decide();
     DeliverCallback onDeliver;
     ConsensusMsgProcessor consensusMsgProcessor;
-    ConsensusMsgProcessor2 consensusMsgProcessor2;
 
     Map<Pair<Integer, Integer>, ArrayList<Pending>> pendingMsgs = new ConcurrentHashMap<>();
     Map<Integer, ArrayList<Integer>> pendingMessages = new ConcurrentHashMap<>();
@@ -63,7 +60,6 @@ public class Replica {
         this.gid = gid;
         replicaMap.put(pid, this);
         consensusMsgProcessor = new ConsensusMsgProcessor(this);
-        consensusMsgProcessor2 = new ConsensusMsgProcessor2(this);
 
         LC = new AtomicInteger(0);
         instanceNum = new AtomicInteger(0);
@@ -82,7 +78,6 @@ public class Replica {
     void startRunning(int poolsize, int recvQueue, int sendQueue, int wqSize, int servicetimeout,
                       boolean polling, int maxinline, int signalInterval) {
         new RamcastReceiver(host, port, ByteBuffer.allocateDirect(10), consensusMsgProcessor, (x) -> {}, (x)->{});
-        new RamcastReceiver(host, port+100, ByteBuffer.allocateDirect(10), consensusMsgProcessor2, (x) -> {}, (x)->{});
         try {
             Thread.sleep(3000);
         } catch (Exception e) {
@@ -104,12 +99,9 @@ public class Replica {
     public boolean connect(Replica replica, int sendQueue, int recvQueue, int maxinline, int clienttimeout) {
         RamcastSender sender =
                 new RamcastSender(replica.host, replica.port, sendQueue,recvQueue, maxinline);
-        RamcastSender sender2 =
-                new RamcastSender(replica.host, replica.port+100, sendQueue,recvQueue, maxinline);
         logger.debug("senders created for {}, port {} and {}", replica.host, replica.port, replica.port+100);
 
         senders.put(replica.pid, sender);
-        senders2.put(replica.pid, sender2);
         return true;
     }
 
@@ -119,10 +111,6 @@ public class Replica {
 
     RamcastFuture sendNonBlocking(ConsensusMessage msg, boolean expectReply, int nodeId) {
         return senders.get(nodeId).sendNonBlocking(msg.getBuffer(), expectReply);
-    }
-
-    RamcastFuture sendNonBlocking2(ConsensusMessage msg, boolean expectReply, int nodeId) {
-        return senders2.get(nodeId).sendNonBlocking(msg.getBuffer(), expectReply);
     }
 
     ByteBuffer deliverReply(RamcastFuture future) {
@@ -197,7 +185,7 @@ public class Replica {
         logger.debug("replica {} is sending to replicas {} MESSAGE {}", pid, replicaList, consensusMessage);
         Set<RamcastFuture> deliverFutures = new HashSet<>();
         for (Replica replica : replicaList) {
-            RamcastFuture future = sendNonBlocking2(consensusMessage, true, replica.pid);
+            RamcastFuture future = sendNonBlocking(consensusMessage, true, replica.pid);
             deliverFutures.add(future);
         }
         logger.debug("replica {} is waiting for ACKs from replicas {}", pid, replicaList);
@@ -228,6 +216,11 @@ public class Replica {
         ArrayList<Integer> arrayList = pendingMessages.get(consensusInstanceNum);
         logger.debug("put {} from replica {} into pending messages. received {} votes for consensus instance {}",
                 wrapperMessage, replicaId, arrayList.size(), consensusInstanceNum);
+
+//        if (arrayList.size() == Group.getGroup(gid).replicaList.size()) {
+//            SkeenMessage deliverMessage = wrapperMessage.getSkeenMessage();
+//            decideCallback.call(deliverMessage);
+//        }
 
         if (arrayList.size() > Group.getGroup(gid).replicaList.size() / 2) {
             logger.debug("received majority votes for consensus instance {} message {}. put into pending majority messages", consensusInstanceNum, message);
@@ -275,7 +268,7 @@ public class Replica {
                     deliverFutures.add(future);
                     logger.debug("sent skeenMessage {} to server {}", newSkeenMessage, gLeader);
                 }
-                server.deliverReply(deliverFutures);
+//                server.deliverReply(deliverFutures);
             }
         }
 
